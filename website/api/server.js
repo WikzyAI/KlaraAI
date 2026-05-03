@@ -7,11 +7,25 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_STRIPE_SECRET_KEY');
+
+// Verify Stripe config on startup
+console.log('[Stripe] Configured:', process.env.STRIPE_SECRET_KEY ? 'YES' : 'NO (using test key)');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JSON_DB = path.join(__dirname, 'credits.json');
 const BOT_TOKEN = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN || '';
+
+// Credit pack definitions (price in cents USD)
+const CREDIT_PACKS = {
+    'Starter': { credits: 100, price_usd: 100 },      // $1
+    'Popular': { credits: 500, price_usd: 500 },      // $5
+    'Pro': { credits: 1000, price_usd: 1000 },        // $10
+    'Elite': { credits: 5000, price_usd: 5000 },      // $50
+    'Standard': { credits: 1600, price_usd: 1600 },   // $16 (1 month sub)
+    'Premium': { credits: 3200, price_usd: 3200 }    // $32 (1 month sub)
+};
 
 console.log('[Server] Bot token configured:', BOT_TOKEN ? 'YES' : 'NO');
 
@@ -34,7 +48,16 @@ if (BOT_TOKEN) {
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+
+// JSON parser for all routes except Stripe webhook
+const jsonParser = express.json();
+app.use((req, res, next) => {
+    if (req.path === '/api/stripe-webhook') {
+        next();
+    } else {
+        jsonParser(req, res, next);
+    }
+});
 
 // ============================================
 // Database (JSON file storage)
@@ -283,6 +306,137 @@ app.get('/api/leaderboard', (req, res) => {
         .sort((a, b) => b.credits - a.credits)
         .slice(0, 10);
     res.json(users);
+});
+
+// ============================================
+// Stripe Payment Routes
+// ============================================
+
+// Create Stripe Checkout Session
+app.post('/api/create-checkout', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Missing token' });
+    }
+
+    const token = authHeader.substring(7);
+    const user = await verifyDiscordToken(token);
+    if (!user) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { pack_name, amount, price_usd } = req.body;
+
+    if (!pack_name || !CREDIT_PACKS[pack_name]) {
+        return res.status(400).json({ error: 'Invalid pack name' });
+    }
+
+    const pack = CREDIT_PACKS[pack_name];
+    const credits = pack.credits;
+    const priceInCents = pack.price_usd;
+
+    try {
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{
+                price_data: {
+                    currency: 'usd',
+                    product_data: {
+                        name: `KlaraAI - ${pack_name} Pack (${credits} credits)`,
+                        description: `${credits} credits for KlaraAI Discord Bot`,
+                        images: ['https://klaraai.vercel.app/img/logo.png'],
+                    },
+                    unit_amount: priceInCents,
+                },
+                quantity: 1,
+            }],
+            mode: 'payment',
+            success_url: `${req.headers.origin || 'https://klaraai.vercel.app'}/buy-credits.html?success=true&credits=${credits}`,
+            cancel_url: `${req.headers.origin || 'https://klaraai.vercel.app'}/buy-credits.html?canceled=true`,
+            metadata: {
+                discord_id: user.id,
+                username: user.username,
+                pack_name: pack_name,
+                credits: credits.toString()
+            },
+            client_reference_id: user.id
+        });
+
+        console.log(`[Stripe] Created checkout session ${session.id} for ${user.username} (${user.id}) - ${credits} credits`);
+        res.json({ url: session.url, session_id: session.id });
+    } catch (error) {
+        console.error('[Stripe] Checkout error:', error.message);
+        res.status(500).json({ error: 'Failed to create checkout session', details: error.message });
+    }
+});
+
+// Stripe Webhook - Handle successful payments
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+
+    let event;
+
+    try {
+        if (webhookSecret) {
+            event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        } else {
+            // For testing without webhook secret
+            event = JSON.parse(req.body.toString());
+        }
+    } catch (err) {
+        console.error(`[Stripe] Webhook signature verification failed:`, err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the checkout.session.completed event
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+
+        const discordId = session.metadata.discord_id;
+        const username = session.metadata.username;
+        const packName = session.metadata.pack_name;
+        const credits = parseInt(session.metadata.credits);
+
+        if (!discordId || !credits) {
+            console.error('[Stripe] Missing metadata in session:', session.id);
+            return res.json({ received: true });
+        }
+
+        // Add credits to user
+        const data = readJSONDB();
+        if (!data.users[discordId]) {
+            data.users[discordId] = {
+                credits: 0,
+                username: username,
+                history: [],
+                created_at: new Date().toISOString()
+            };
+        }
+
+        data.users[discordId].credits += credits;
+        data.users[discordId].username = username;
+        data.users[discordId].history = data.users[discordId].history || [];
+        data.users[discordId].history.push({
+            type: 'add',
+            amount: credits,
+            pack_name: packName,
+            timestamp: new Date().toISOString(),
+            stripe_session: session.id,
+            payment_status: session.payment_status
+        });
+        data.users[discordId].updated_at = new Date().toISOString();
+
+        writeJSONDB(data);
+
+        console.log(`[Stripe] Added ${credits} credits to ${discordId} (${username}) - Session: ${session.id}`);
+
+        // Send DM notification
+        const thankYouMsg = `Thank you for your purchase! You have added **${credits} credits** (${packName} Pack). Your new balance is **${data.users[discordId].credits} credits**. Enjoy!`;
+        sendDM(discordId, thankYouMsg);
+    }
+
+    res.json({ received: true });
 });
 
 // ============================================

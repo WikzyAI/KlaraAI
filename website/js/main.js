@@ -234,7 +234,7 @@ async function getUserCredits(discordId) {
     return data ? data.credits : 0;
 }
 
-async function buyCredits(amount, packName) {
+async function buyCredits(amount, packName, priceUSD) {
     if (!isDiscordLoggedIn()) {
         const warning = document.getElementById('login-warning');
         if (warning) warning.style.display = 'block';
@@ -244,24 +244,29 @@ async function buyCredits(amount, packName) {
     const user = getDiscordUser();
     if (!user) return;
 
-    const result = await apiRequest('/api/credits/add', {
-        method: 'POST',
-        body: JSON.stringify({
-            discord_id: user.id,
-            amount: amount,
-            pack_name: packName
-        })
-    });
+    try {
+        const response = await fetch(`${API_BASE}/api/create-checkout`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('discord_access_token')}`
+            },
+            body: JSON.stringify({
+                pack_name: packName,
+                amount: amount,
+                price_usd: priceUSD
+            })
+        });
 
-    if (result && result.success) {
-        const message = translate('shop_purchase_success')
-            .replace('{pack}', packName)
-            .replace('{amount}', amount)
-            .replace('{balance}', result.new_balance);
-        alert(`✅ ${message}`);
-        await updateCreditsDisplay(user);
-    } else {
-        alert('❌ Erreur lors de l\'achat. Vérifiez que l\'API est démarrée (cd api && npm start).');
+        const data = await response.json();
+        if (data.url) {
+            window.location.href = data.url;
+        } else {
+            alert('❌ Error: ' + (data.error || 'An error occurred'));
+        }
+    } catch (e) {
+        console.error('[Stripe] Checkout error:', e);
+        alert('❌ Connection error to API.');
     }
 }
 

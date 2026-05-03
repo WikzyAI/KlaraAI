@@ -227,10 +227,23 @@ class ERPCog(commands.Cog):
         await interaction.response.defer(thinking=True)
         await self._erp_end(interaction)
 
+    def _is_character_visible(self, char_key: str, char_data: dict, user_id: str) -> bool:
+        """Check if a character is visible to the user (public or owned by user)."""
+        creator = char_data.get("creator")
+        if not creator:
+            return True  # Public character
+        return str(creator) == str(user_id)
+
+    def _get_visible_characters(self, user_id: str) -> dict:
+        """Get characters visible to the user (public + own private chars)."""
+        all_chars = self._load_characters()
+        return {k: v for k, v in all_chars.items() if self._is_character_visible(k, v, user_id)}
+
     async def _button_list(self, interaction: discord.Interaction, show_buttons: bool = True):
         await interaction.response.defer(thinking=True)
-        characters = self._load_characters()
-        limits = self.profiles_db.get_limits(interaction.user.id)
+        user_id = str(interaction.user.id)
+        characters = self._get_visible_characters(user_id)
+        limits = self.profiles_db.get_limits(user_id)
 
         embed = discord.Embed(
             title="Available Characters",
@@ -240,8 +253,9 @@ class ERPCog(commands.Cog):
 
         for key, char in characters.items():
             pers = char.get("personality", "N/A")
+            is_private = "🔒" if char.get("creator") else ""
             embed.add_field(
-                name=f"{char['name']} ({key})",
+                name=f"{char['name']} ({key}) {is_private}",
                 value=f"{char['desc']}\n*Traits: {pers}*",
                 inline=False
             )
@@ -262,6 +276,16 @@ class ERPCog(commands.Cog):
 
     async def _start_with_character(self, interaction: discord.Interaction, char_key: str):
         await interaction.response.defer(thinking=True)
+        # Check permission
+        characters = self._load_characters()
+        if char_key not in characters:
+            await interaction.followup.send(f"❌ Character '{char_key}' not found.", ephemeral=True)
+            return
+        char = characters[char_key]
+        creator = char.get("creator")
+        if creator and str(creator) != str(interaction.user.id):
+            await interaction.followup.send("❌ This is a private character. You cannot use it.", ephemeral=True)
+            return
         await self._erp_start(interaction, char_key)
 
     async def _button_info(self, interaction: discord.Interaction):
@@ -298,6 +322,13 @@ class ERPCog(commands.Cog):
 
         if char_key not in characters:
             await interaction.followup.send(f"❌ Character '{character}' not found. Use `/erp list`.", ephemeral=True)
+            return
+
+        # Check permission - private chars only usable by creator
+        char = characters[char_key]
+        creator = char.get("creator")
+        if creator and str(creator) != str(interaction.user.id):
+            await interaction.followup.send("❌ This is a private character. You cannot use it.", ephemeral=True)
             return
 
         if self.history_db.has_active_session(interaction.user.id):
@@ -352,26 +383,30 @@ class ERPCog(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     async def _erp_list(self, interaction: discord.Interaction):
-        characters = self._load_characters()
-        limits = self.profiles_db.get_limits(interaction.user.id)
+        user_id = str(interaction.user.id)
+        characters = self._get_visible_characters(user_id)
 
         embed = discord.Embed(
             title="Available Characters",
-            description="Use `/erp start <character>` to begin.",
+            description="Use  to begin.",
             color=discord.Color.from_rgb(147, 112, 219)
         )
 
-        for key, char in characters.items():
-            pers = char.get("personality", "N/A")
-            embed.add_field(
-                name=f"{char['name']} ({key})",
-                value=f"{char['desc']}\n*Traits: {pers}*",
-                inline=False
-            )
+        if not characters:
+            embed.description = "No characters available. Use  to create your own!"
+        else:
+            for key, char in characters.items():
+                pers = char.get("personality", "N/A")
+                is_private = " 🔒" if char.get("creator") else ""
+                embed.add_field(
+                    name=f"{char['name']} ({key}){is_private}",
+                    value=f"{char['desc']}
+*Traits: {pers}*",
+                    inline=False
+                )
 
-        embed.set_footer(text="/erp start <character> to launch a session")
+        embed.set_footer(text="Use /erp start <character> to launch a session")
         await interaction.followup.send(embed=embed)
-
     async def _erp_info(self, interaction: discord.Interaction, character: str):
         if not character:
             await interaction.followup.send("❌ You must specify a character.", ephemeral=True)

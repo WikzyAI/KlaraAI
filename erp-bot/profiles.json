@@ -3,11 +3,22 @@
     "name": null,
     "age": null,
     "description": null,
-    "sub_type": "free",
+    "sub_type": "premium",
+    "credits": 0,
+    "daily_msgs_used": 9,
+    "daily_sessions_used": 4,
+    "last_reset": "2026-05-03",
+    "response_length": "short"
+  },
+  "1480976129551499365": {
+    "name": null,
+    "age": null,
+    "description": null,
+    "sub_type": "premium",
     "credits": 0,
     "daily_msgs_used": 3,
     "daily_sessions_used": 2,
     "last_reset": "2026-05-03",
-    "response_length": "short"
+    "response_length": "medium"
   }
 }

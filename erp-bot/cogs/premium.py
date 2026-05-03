@@ -89,6 +89,15 @@ class PremiumCog(commands.Cog):
             prem_btn.callback = self._upgrade_premium
             view.add_item(prem_btn)
 
+        # Buy Credits button - redirects to website
+        buy_btn = discord.ui.Button(
+            label="Buy Credits",
+            style=discord.ButtonStyle.link,
+            emoji="🛒",
+            url="https://klaraai.vercel.app"
+        )
+        view.add_item(buy_btn)
+
         await interaction.followup.send(embed=embed, view=view)
 
     async def _upgrade_standard(self, interaction: discord.Interaction):

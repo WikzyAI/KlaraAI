@@ -23,8 +23,16 @@ const CONFIG = {
             ADD_CREDITS: '/api/credits/add',
             UPDATE_USER: '/api/users/update',
             HEALTH: '/api/health',
-            LEADERBOARD: '/api/leaderboard'
+            LEADERBOARD: '/api/leaderboard',
+            CREATE_CHECKOUT: '/api/create-checkout'
         }
+    },
+
+    // Stripe
+    STRIPE: {
+        PUBLISHABLE_KEY: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? 'pk_test_51TT5mJFK6zkSFvwwFOSzTgacMTJrrltX8UHiMcsTELFolmkDJnq4VVni2Xrj4FzgwSwgOsDx4iROowW4CXXijZiw00LTBwRN3S'
+            : 'pk_test_51TT5mJFK6zkSFvwwFOSzTgacMTJrrltX8UHiMcsTELFolmkDJnq4VVni2Xrj4FzgwSwgOsDx4iROowW4CXXijZiw00LTBwRN3S'
     },
 
     // Feature flags
