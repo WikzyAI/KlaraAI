@@ -191,7 +191,7 @@ function isDiscordLoggedIn() {
 // ============================================
 const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:3000'
-    : window.location.origin;
+    : 'https://klaraai.onrender.com';
 
 async function apiRequest(endpoint, options = {}) {
     const token = localStorage.getItem('discord_access_token');

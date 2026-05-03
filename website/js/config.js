@@ -17,7 +17,7 @@ const CONFIG = {
     API: {
         BASE_URL: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
             ? 'http://localhost:3000'
-            : window.location.origin,
+            : 'https://klaraai.onrender.com',
         ENDPOINTS: {
             CREDITS: '/api/credits',
             ADD_CREDITS: '/api/credits/add',
