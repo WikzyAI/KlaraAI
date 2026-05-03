@@ -118,13 +118,24 @@ class ERPCog(commands.Cog):
         # Incrémenter le compteur de messages
         self.profiles_db.increment_messages(user_id)
 
-        embed = discord.Embed(
-            description=ai_response,
-            color=discord.Color.from_rgb(147, 112, 219)
-        )
-        embed.set_footer(text=f"{character['name']} • /erp end pour terminer")
-
-        await message.channel.send(embed=embed)
+        # Send as plain text (not embed) - actions in *asterisks*, dialogue as normal text
+        # Split message if it exceeds Discord's 2000 char limit
+        max_length = 2000
+        if len(ai_response) <= max_length:
+            await message.channel.send(ai_response)
+        else:
+            # Split into chunks at sentence boundaries
+            chunks = []
+            current = ""
+            for char in ai_response:
+                current += char
+                if len(current) >= max_length - 100 and char in ".!?\n":
+                    chunks.append(current)
+                    current = ""
+            if current:
+                chunks.append(current)
+            for chunk in chunks:
+                await message.channel.send(chunk)
         print(f"[DEBUG ERP] Réponse envoyée avec succès")
         return True
 
