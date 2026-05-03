@@ -1,6 +1,6 @@
 """
 ERP Cog - Erotic roleplay system with automatic DM responses.
-Once /erp start is launched, the bot replies automatically to messages.
+Once a session is started via /erp (buttons), the bot replies automatically to messages.
 """
 import discord
 from discord import app_commands
@@ -74,7 +74,7 @@ class ERPCog(commands.Cog):
             limits = self.profiles_db.get_limits(user_id)
             await message.channel.send(
                 f"❌ Daily message limit reached ({'unlimited' if limits['daily_msgs'] == -1 else limits['daily_msgs']})/day. "
-                f"Try again tomorrow or use `/premium` to upgrade."
+                f"Try again tomorrow or use `/premium` to upgrade your subscription."
             )
             return True
 
@@ -82,7 +82,7 @@ class ERPCog(commands.Cog):
         char_key = session.get("character")
         if char_key not in characters:
             print(f"[DEBUG ERP] Character {char_key} not found")
-            await message.channel.send("❌ Your session's character no longer exists. Use `/erp end` then start again.")
+            await message.channel.send("❌ Your session's character no longer exists. Use `/erp` and click 'End' to close the session.")
             return True
 
         character = characters[char_key]
@@ -171,24 +171,12 @@ class ERPCog(commands.Cog):
     # SLASH COMMANDS
     # =======================================================================
 
-    @app_commands.command(name="erp", description="Manage your ERP sessions")
-    @app_commands.describe(
-        character="Character name (for 'start' or 'info')",
-        description="Character description (for 'create')",
-        personality="Personality traits (for 'create')"
-    )
-    async def erp(self, interaction: discord.Interaction,
-                  character: str = None,
-                  description: str = None,
-                  personality: str = None):
+    @app_commands.command(name="erp", description="Manage your ERP sessions - shows button menu")
+    async def erp(self, interaction: discord.Interaction):
+        """Show ERP session manager with buttons."""
         await interaction.response.defer(thinking=True)
 
-        # If character is provided, start directly
-        if character:
-            await self._erp_start(interaction, character)
-            return
-
-        # Show button menu
+        # Always show button menu
         embed = discord.Embed(
             title="🎭 ERP Session Manager",
             description="Click a button below to manage your ERP session.",
@@ -232,7 +220,7 @@ class ERPCog(commands.Cog):
 
     async def _button_start(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
-        await self._erp_list(interaction, show_buttons=False)
+        await self._erp_list(interaction, show_buttons=True)
 
     async def _button_end(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
@@ -300,7 +288,7 @@ class ERPCog(commands.Cog):
         await self._erp_start(interaction, char_key)
 
     async def _button_info(self, interaction: discord.Interaction):
-        await interaction.response.send_message("❌ Use `/erp info <character>` to get info on a specific character.", ephemeral=True)
+        await interaction.response.send_message("❌ Use `/erp` and click 'Character Info' to get info on a specific character.", ephemeral=True)
 
     async def _button_create(self, interaction: discord.Interaction):
         # Check if user can create custom characters
@@ -325,14 +313,14 @@ class ERPCog(commands.Cog):
 
     async def _erp_start(self, interaction: discord.Interaction, character: str):
         if not character:
-            await interaction.followup.send("❌ You must specify a character. Use `/erp list` to see available ones.", ephemeral=True)
+            await interaction.followup.send("❌ You must specify a character. Use `/erp` and click 'List Characters'.", ephemeral=True)
             return
 
         characters = self._load_characters()
         char_key = character.lower()
 
         if char_key not in characters:
-            await interaction.followup.send(f"❌ Character '{character}' not found. Use `/erp list`.", ephemeral=True)
+            await interaction.followup.send(f"❌ Character '{character}' not found. Use `/erp` and click 'List Characters'.", ephemeral=True)
             return
 
         # Check permission - private chars only usable by creator
@@ -343,7 +331,7 @@ class ERPCog(commands.Cog):
             return
 
         if self.history_db.has_active_session(interaction.user.id):
-            await interaction.followup.send("❌ You already have a session in progress. Use `/erp end` to end it.", ephemeral=True)
+            await interaction.followup.send("❌ You already have a session in progress. Use `/erp` and click 'End' to end it.", ephemeral=True)
             return
 
         # CHECK DAILY LIMITS
@@ -373,7 +361,7 @@ class ERPCog(commands.Cog):
             description=f"{char['desc']}\n\n**Write your first message to begin!**\nThe bot will automatically reply to your messages.",
             color=discord.Color.from_rgb(255, 105, 180)
         )
-        embed.set_footer(text="Use /erp end to end the session")
+        embed.set_footer(text="Use /erp and click 'End' to end the session")
         await interaction.followup.send(embed=embed)
 
     async def _erp_end(self, interaction: discord.Interaction):
@@ -416,7 +404,7 @@ class ERPCog(commands.Cog):
                     inline=False
                 )
 
-        embed.set_footer(text="Use /erp start <character> to launch a session")
+        embed.set_footer(text="Use /erp to launch a session, then click 'Start'")
         await interaction.followup.send(embed=embed)
     async def _erp_info(self, interaction: discord.Interaction, character: str):
         if not character:
@@ -439,7 +427,7 @@ class ERPCog(commands.Cog):
         )
         embed.add_field(name="Personality", value=char.get("personality", "N/A"), inline=False)
         embed.add_field(name="Key", value=f"`{char_key}`", inline=True)
-        embed.set_footer(text=f"Use /erp start {char_key} to play this character")
+        embed.set_footer(text=f"Click 'Start' in /erp to play this character")
         await interaction.followup.send(embed=embed)
 
     async def _erp_create(self, interaction: discord.Interaction,
@@ -487,7 +475,7 @@ class ERPCog(commands.Cog):
             color=discord.Color.green()
         )
         embed.add_field(name="Key", value=f"`{char_key}`", inline=True)
-        embed.set_footer(text=f"Use /erp start {char_key} to begin")
+        embed.set_footer(text=f"Click 'Start' in /erp to begin")
         await interaction.followup.send(embed=embed)
 
 
@@ -548,7 +536,7 @@ class CharacterCreateModal(discord.ui.Modal):
             color=discord.Color.green()
         )
         embed.add_field(name="Key", value=f"`{char_key}`", inline=True)
-        embed.set_footer(text=f"Use /erp start {char_key} to begin")
+        embed.set_footer(text=f"Click 'Start' in /erp to begin")
         await interaction.followup.send(embed=embed)
 
 

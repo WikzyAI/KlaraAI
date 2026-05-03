@@ -93,7 +93,7 @@ class Characters(commands.Cog):
                 inline=False
             )
 
-        embed.set_footer(text="Use /erp start <character> to begin | /character info <name> for details")
+        embed.set_footer(text="Use /erp and click 'Start' to begin | Use /character info <name> for details")
         await interaction.followup.send(embed=embed)
 
     async def _character_info(self, interaction: discord.Interaction, name: str):
@@ -114,7 +114,7 @@ class Characters(commands.Cog):
         )
         embed.add_field(name="Personality", value=char.get("personality", "N/A"), inline=False)
         embed.add_field(name="Key", value=f"`{char_key}`", inline=True)
-        embed.set_footer(text=f"Use /erp start {char_key} to roleplay with this character")
+        embed.set_footer(text=f"Use /erp and click 'Start' to roleplay with this character")
 
         await interaction.followup.send(embed=embed)
 
@@ -157,7 +157,7 @@ class Characters(commands.Cog):
         embed.add_field(name="Description", value=description, inline=False)
         if personality:
             embed.add_field(name="Personality", value=personality, inline=False)
-        embed.set_footer(text=f"Use /erp start {char_key} to start roleplaying with your new character!")
+        embed.set_footer(text=f"Use /erp and click 'Start' to start roleplaying with your new character!")
 
         await interaction.followup.send(embed=embed)
 

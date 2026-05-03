@@ -24,25 +24,26 @@ class GeneralCog(commands.Cog):
                   "/profile - View or update your profile\n"
                   "/settings - Configure bot settings\n"
                   "/premium - Manage your subscription\n"
-                  "/erp start <character> - Start an ERP session",
+                  "/erp - Show ERP session manager (buttons)",
             inline=False
         )
 
         embed.add_field(
             name="ERP - Erotic Roleplay",
-            value="/erp start <character> - Begin with a character\n"
-                  "/erp end - End the session\n"
-                  "/erp list - List available characters\n"
-                  "/erp info <char> - Info on a character\n"
-                  "/erp create - Create your own character (premium)",
+            value="Use /erp to show the button menu\n"
+                  "• Click 'Start' to begin with a character\n"
+                  "• Click 'End' to close the session\n"
+                  "• Click 'List Characters' to see available characters\n"
+                  "• Click 'Character Info' for details\n"
+                  "• Create your own character in /settings (premium)",
             inline=False
         )
 
         embed.add_field(
             name="Notes",
             value="• Bot only works in DMs\n"
-                  "• Once /erp start is launched, the bot replies automatically\n"
-                  "• Use /erp end to stop",
+                  "• Once a session is started via /erp buttons, the bot replies automatically\n"
+                  "• Use /erp and click 'End' to stop",
             inline=False
         )
 
