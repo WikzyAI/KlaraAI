@@ -102,38 +102,44 @@ class PremiumCog(commands.Cog):
 
         user_id = str(interaction.user.id)
         profile = self.db.get_profile(user_id)
+        current_sub = self.db.get_sub_type(user_id)
 
         # Get credits from API
         credits_data = await asyncio.to_thread(get_credits, user_id)
         credits = credits_data.get("credits", 0)
 
-        price = config.SUBSCRIPTIONS[new_type]["price_month"]
+        new_price = config.SUBSCRIPTIONS[new_type]["price_month"]
+        current_price = config.SUBSCRIPTIONS.get(current_sub, config.SUBSCRIPTIONS["free"])["price_month"]
 
-        if credits >= price:
+        # On ne déduit que la différence
+        price_to_pay = new_price - current_price
+
+        if credits >= price_to_pay:
             # Deduct credits via API (negative amount)
             from utils.api_client import add_credits
-            result = await asyncio.to_thread(add_credits, user_id, -price, profile.get("name", ""), config.SUBSCRIPTIONS[new_type]["name"])
+            result = await asyncio.to_thread(add_credits, user_id, -price_to_pay, profile.get("name", ""), f"Upgrade to {config.SUBSCRIPTIONS[new_type]['name']}")
             if result.get("success"):
-                # Update subscription type in local DB (but not credits)
+                # Update subscription type in local DB
                 self.db.update_profile(user_id, sub_type=new_type)
                 embed = discord.Embed(
                     title="✅ Achat réussi !",
                     description=f"Félicitations ! Tu es maintenant abonné au forfait **{config.SUBSCRIPTIONS[new_type]['name']}** ! 💎\n"
-                                f"**{price} crédits** ont été débités.\n"
-                                f"Ton nouveau solde : **{result.get('new_balance', credits - price)} crédits**.",
+                                f"**{price_to_pay} crédits** ont été débités (différence avec ton abonnement actuel).\n"
+                                f"Ton nouveau solde : **{result.get('new_balance', credits - price_to_pay)} crédits**.",
                     color=discord.Color.gold()
                 )
             else:
                 embed = discord.Embed(
-                    title="❌ Erreur",
-                    description="Une erreur est survenue lors du débit des crédits. Vérifie que l'API est configurée (API_SECRET).",
+                    title="❌ Erreur API",
+                    description=f"Erreur lors du débit des crédits. Détails : {result.get('error', 'inconnu')}. Vérifie que API_SECRET est configuré sur Render.",
                     color=discord.Color.red()
                 )
         else:
             embed = discord.Embed(
                 title="❌ Crédits Insuffisants",
-                description=f"Il te faut {price} crédits pour ce forfait.\n"
-                            f"Tu as actuellement : **{credits} crédits**.",
+                description=f"Il te faut **{price_to_pay} crédits** supplémentaires pour passer au forfait {config.SUBSCRIPTIONS[new_type]['name']}.\n"
+                            f"Tu as actuellement : **{credits} crédits**.\n"
+                            f"(Prix du nouveau forfait : {new_price}, ton abonnement actuel : {current_price})",
                 color=discord.Color.red()
             )
 

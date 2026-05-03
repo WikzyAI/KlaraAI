@@ -9,6 +9,7 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
 # API Base URL - change to your production URL when deploying
+# On Render, set API_BASE=http://localhost:10000 in environment variables
 API_BASE = os.getenv("API_BASE", "http://localhost:3000")
 
 def get_credits(discord_id: str) -> dict:
