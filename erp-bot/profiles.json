@@ -3,7 +3,7 @@
     "name": null,
     "age": null,
     "description": null,
-    "sub_type": "standard",
+    "sub_type": "free",
     "credits": 0,
     "daily_msgs_used": 0,
     "daily_sessions_used": 0,
