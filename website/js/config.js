@@ -8,7 +8,7 @@ const CONFIG = {
         CLIENT_ID: '1500196432211349634',
         REDIRECT_URI: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
             ? 'http://localhost:8000'
-            : window.location.origin,
+            : 'https://klaraai.vercel.app',
         SCOPES: 'identify',
         RESPONSE_TYPE: 'token'
     },
