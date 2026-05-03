@@ -124,22 +124,6 @@ class ProfilesDB(JSONDatabase):
         profile = self.get_profile(user_id)
         sub_type = profile.get("sub_type", "free")
 
-        # Check API credits to determine actual subscription level
-        try:
-            from utils.api_client import get_credits
-            import asyncio
-            credits_data = get_credits(str(user_id))
-            credits = credits_data.get("credits", 0)
-            # Upgrade sub_type based on credits if needed
-            if credits >= 3200 and sub_type != "premium":
-                sub_type = "premium"
-                self.update_profile(user_id, sub_type="premium")
-            elif credits >= 1600 and sub_type == "free":
-                sub_type = "standard"
-                self.update_profile(user_id, sub_type="standard")
-        except Exception as e:
-            print(f"[DB] Error checking API credits: {e}")
-
         sub = config.SUBSCRIPTIONS.get(sub_type, config.SUBSCRIPTIONS["free"])
         return {
             "daily_msgs": sub["daily_msgs"],
