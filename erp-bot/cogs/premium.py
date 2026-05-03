@@ -1,5 +1,5 @@
 """
-Premium Cog - Gestion des abonnements.
+Premium Cog - Subscription management.
 """
 import discord
 from discord import app_commands
@@ -15,7 +15,7 @@ class PremiumCog(commands.Cog):
         self.bot = bot
         self.db = ProfilesDB(config.PROFILES_FILE)
 
-    @app_commands.command(name="premium", description="Gère ton abonnement")
+    @app_commands.command(name="premium", description="Manage your subscription")
     async def premium(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
 
@@ -28,38 +28,38 @@ class PremiumCog(commands.Cog):
         credits_data = await asyncio.to_thread(get_credits, user_id)
         credits = credits_data.get("credits", 0)
 
-        # Calculer l'utilisation quotidienne
+        # Calculate daily usage
         daily_msgs_used = profile.get("daily_msgs_used", 0)
         daily_sessions_used = profile.get("daily_sessions_used", 0)
-        msgs_limit = "illimités" if limits["daily_msgs"] == -1 else limits["daily_msgs"]
-        sessions_limit = "illimitées" if limits["daily_sessions"] == -1 else limits["daily_sessions"]
+        msgs_limit = "unlimited" if limits["daily_msgs"] == -1 else limits["daily_msgs"]
+        sessions_limit = "unlimited" if limits["daily_sessions"] == -1 else limits["daily_sessions"]
 
         embed = discord.Embed(
-            title="💎 Gestion de l'abonnement",
-            description=f"Ton abonnement actuel : **{limits['name']}**",
+            title="💎 Subscription Management",
+            description=f"Your current plan: **{limits['name']}**",
             color=discord.Color.gold()
         )
 
         embed.add_field(
-            name="📊 Utilisation aujourd'hui",
-            value=f"Messages : {daily_msgs_used}/{msgs_limit}\n"
-                  f"Séances : {daily_sessions_used}/{sessions_limit}\n"
-                  f"Crédits : {credits}",
+            name="📊 Today's Usage",
+            value=f"Messages: {daily_msgs_used}/{msgs_limit}\n"
+                  f"Sessions: {daily_sessions_used}/{sessions_limit}\n"
+                  f"Credits: {credits}",
             inline=False
         )
 
-        # Afficher les 3 forfaits
+        # Show all 3 plans
         for sub_key in ["free", "standard", "premium"]:
             sub = config.SUBSCRIPTIONS[sub_key]
             if sub_key == sub_type:
-                title = f"✅ {sub['name']} (actuel)"
+                title = f"✅ {sub['name']} (current)"
             else:
                 title = sub["name"]
 
             if sub_key != "free":
-                value = f"Prix : {sub['price_month']} crédits/mois\n"
+                value = f"Price: {sub['price_month']} credits/month\n"
             else:
-                value = "Gratuit\n"
+                value = "Free\n"
             value += "\n".join(f"• {feat}" for feat in sub["features"])
 
             embed.add_field(
@@ -68,12 +68,12 @@ class PremiumCog(commands.Cog):
                 inline=False
             )
 
-        # Boutons pour upgrader
+        # Buttons to upgrade
         view = discord.ui.View()
 
         if sub_type != "standard":
             std_btn = discord.ui.Button(
-                label=f"Passer au Standard ({config.SUBSCRIPTIONS['standard']['price_month']} crédits)",
+                label=f"Switch to Standard ({config.SUBSCRIPTIONS['standard']['price_month']} credits)",
                 style=discord.ButtonStyle.primary,
                 emoji="💎"
             )
@@ -82,7 +82,7 @@ class PremiumCog(commands.Cog):
 
         if sub_type != "premium":
             prem_btn = discord.ui.Button(
-                label=f"Passer au Premium ({config.SUBSCRIPTIONS['premium']['price_month']} crédits)",
+                label=f"Switch to Premium ({config.SUBSCRIPTIONS['premium']['price_month']} credits)",
                 style=discord.ButtonStyle.success,
                 emoji="💎"
             )
@@ -111,7 +111,7 @@ class PremiumCog(commands.Cog):
         new_price = config.SUBSCRIPTIONS[new_type]["price_month"]
         current_price = config.SUBSCRIPTIONS.get(current_sub, config.SUBSCRIPTIONS["free"])["price_month"]
 
-        # On ne déduit que la différence
+        # Only deduct the difference
         price_to_pay = new_price - current_price
 
         if credits >= price_to_pay:
@@ -122,24 +122,24 @@ class PremiumCog(commands.Cog):
                 # Update subscription type in local DB
                 self.db.update_profile(user_id, sub_type=new_type)
                 embed = discord.Embed(
-                    title="✅ Achat réussi !",
-                    description=f"Félicitations ! Tu es maintenant abonné au forfait **{config.SUBSCRIPTIONS[new_type]['name']}** ! 💎\n"
-                                f"**{price_to_pay} crédits** ont été débités (différence avec ton abonnement actuel).\n"
-                                f"Ton nouveau solde : **{result.get('new_balance', credits - price_to_pay)} crédits**.",
+                    title="✅ Purchase Successful!",
+                    description=f"Congratulations! You are now subscribed to **{config.SUBSCRIPTIONS[new_type]['name']}**! 💎\n"
+                                f"**{price_to_pay} credits** have been deducted (difference from your current plan).\n"
+                                f"Your new balance: **{result.get('new_balance', credits - price_to_pay)} credits**.",
                     color=discord.Color.gold()
                 )
             else:
                 embed = discord.Embed(
-                    title="❌ Erreur API",
-                    description=f"Erreur lors du débit des crédits. Détails : {result.get('error', 'inconnu')}. Vérifie que API_SECRET est configuré sur Render.",
+                    title="❌ API Error",
+                    description=f"Error deducting credits. Details: {result.get('error', 'unknown')}. Check API_SECRET is set on Render.",
                     color=discord.Color.red()
                 )
         else:
             embed = discord.Embed(
-                title="❌ Crédits Insuffisants",
-                description=f"Il te faut **{price_to_pay} crédits** supplémentaires pour passer au forfait {config.SUBSCRIPTIONS[new_type]['name']}.\n"
-                            f"Tu as actuellement : **{credits} crédits**.\n"
-                            f"(Prix du nouveau forfait : {new_price}, ton abonnement actuel : {current_price})",
+                title="❌ Insufficient Credits",
+                description=f"You need **{price_to_pay} more credits** to upgrade to {config.SUBSCRIPTIONS[new_type]['name']}.\n"
+                            f"You currently have: **{credits} credits**.\n"
+                            f"(New plan price: {new_price}, your current plan: {current_price})",
                 color=discord.Color.red()
             )
 

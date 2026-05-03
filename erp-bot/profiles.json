@@ -1,1 +1,13 @@
-{}
+{
+  "926474936518856775": {
+    "name": null,
+    "age": null,
+    "description": null,
+    "sub_type": "free",
+    "credits": 0,
+    "daily_msgs_used": 3,
+    "daily_sessions_used": 2,
+    "last_reset": "2026-05-03",
+    "response_length": "short"
+  }
+}

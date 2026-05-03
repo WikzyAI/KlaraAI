@@ -1,6 +1,6 @@
 """
-Profile Cog - Gestion du profil utilisateur.
-Permet de configurer son nom, âge et description.
+Profile Cog - User profile management.
+Allows configuring name, age, description, response length, and custom characters via buttons.
 """
 import discord
 from discord import app_commands
@@ -16,11 +16,11 @@ class ProfileCog(commands.Cog):
         self.bot = bot
         self.db = ProfilesDB(config.PROFILES_FILE)
 
-    @app_commands.command(name="profile", description="Configure ton profil utilisateur")
+    @app_commands.command(name="profile", description="View or update your profile")
     @app_commands.describe(
-        name="Ton nom ou pseudo",
-        age="Ton âge (doit être ≥ 18)",
-        description="Une description de toi (apparence, personnalité, etc.)"
+        name="Your name or nickname",
+        age="Your age (must be ≥ 18)",
+        description="A description of yourself (appearance, personality, etc.)"
     )
     async def profile(self, interaction: discord.Interaction,
                      name: str = None,
@@ -40,7 +40,7 @@ class ProfileCog(commands.Cog):
             return
 
         if age is not None and age < 18:
-            await interaction.followup.send("❌ Tu dois avoir au moins 18 ans pour utiliser ce bot.", ephemeral=True)
+            await interaction.followup.send("❌ You must be at least 18 years old to use this bot.", ephemeral=True)
             return
 
         updates = {}
@@ -54,8 +54,8 @@ class ProfileCog(commands.Cog):
         profile = self.db.update_profile(user_id, **updates)
 
         embed = discord.Embed(
-            title="✅ Profil mis à jour",
-            description="Ton profil a été mis à jour avec succès.",
+            title="✅ Profile Updated",
+            description="Your profile has been updated successfully.",
             color=discord.Color.green()
         )
         embed = self._build_profile_embed(interaction.user, profile, embed)
@@ -64,21 +64,25 @@ class ProfileCog(commands.Cog):
     def _build_profile_embed(self, user: discord.User, profile: dict, credits: int = None, embed: discord.Embed = None) -> discord.Embed:
         if embed is None:
             embed = discord.Embed(
-                title=f"Profil de {user.name}",
+                title=f"{user.name}'s Profile",
                 color=discord.Color.from_rgb(147, 112, 219)
             )
 
         sub_type = profile.get("sub_type", "free")
         sub_name = config.SUBSCRIPTIONS.get(sub_type, config.SUBSCRIPTIONS["free"])["name"]
 
-        embed.add_field(name="Nom", value=profile.get("name") or "Non configuré", inline=True)
-        embed.add_field(name="Âge", value=str(profile.get("age")) if profile.get("age") else "Non configuré", inline=True)
-        embed.add_field(name="💎 Abonnement", value=f"**{sub_name}**", inline=True)
+        response_length = profile.get("response_length", "medium")
+        length_names = {"short": "Short (1-2 paragraphs)", "medium": "Medium (2-4 paragraphs)", "long": "Long (4-6 paragraphs)"}
+
+        embed.add_field(name="Name", value=profile.get("name") or "Not set", inline=True)
+        embed.add_field(name="Age", value=str(profile.get("age")) if profile.get("age") else "Not set", inline=True)
+        embed.add_field(name="💎 Subscription", value=f"**{sub_name}**", inline=True)
+        embed.add_field(name="📏 Response Length", value=length_names.get(response_length, response_length), inline=True)
 
         if credits is not None:
             embed.add_field(
-                name="💎 Crédits",
-                value=f"{credits} crédits (${credits/100:.2f})",
+                name="💎 Credits",
+                value=f"{credits} credits (${credits/100:.2f})",
                 inline=False
             )
 
@@ -86,45 +90,94 @@ class ProfileCog(commands.Cog):
         if desc:
             embed.add_field(name="Description", value=desc[:1024], inline=False)
         else:
-            embed.add_field(name="Description", value="Non configurée", inline=False)
+            embed.add_field(name="Description", value="Not set", inline=False)
 
-        embed.set_footer(text="Utilise /profile name:<nom> age:<âge> description:<desc> pour modifier")
+        embed.set_footer(text="Use /profile name:<name> age:<age> description:<desc> to modify")
         return embed
 
-    @app_commands.command(name="settings", description="Configure les paramètres de réponse de l'IA")
-    @app_commands.describe(response_length="Longueur des réponses de l'IA")
-    @app_commands.choices(response_length=[
-        app_commands.Choice(name="Short - Réponses courtes (1-2 paragraphes)", value="short"),
-        app_commands.Choice(name="Medium - Réponses moyennes (2-4 paragraphes)", value="medium"),
-        app_commands.Choice(name="Long - Réponses longues (4-6 paragraphes)", value="long"),
-    ])
-    async def settings(self, interaction: discord.Interaction, response_length: str = None):
+    @app_commands.command(name="settings", description="Configure bot settings (response length, custom characters)")
+    async def settings(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
+
         user_id = interaction.user.id
         profile = self.db.get_profile(user_id)
+        limits = self.db.get_limits(user_id)
 
-        if response_length is None:
-            # Afficher les paramètres actuels
-            current = profile.get("response_length", "medium")
-            embed = discord.Embed(
-                title="⚙️ Paramètres actuels",
-                description="Utilise `/settings response_length:<choix>` pour changer.",
-                color=discord.Color.blue()
-            )
-            length_names = {"short": "Short (courtes)", "medium": "Medium (moyennes)", "long": "Long (longues)"}
-            embed.add_field(name="📏 Longueur des réponses", value=length_names.get(current, current), inline=False)
-            embed.add_field(name="Options", value="• `short` - 1-2 paragraphes\n• `medium` - 2-4 paragraphes\n• `long` - 4-6 paragraphes", inline=False)
-            await interaction.followup.send(embed=embed)
-            return
-
-        self.db.update_profile(user_id, response_length=response_length)
-        length_names = {"short": "Short (courtes)", "medium": "Medium (moyennes)", "long": "Long (longues)"}
         embed = discord.Embed(
-            title="✅ Paramètre mis à jour",
-            description=f"Longueur des réponses définie sur : **{length_names.get(response_length, response_length)}**",
+            title="⚙️ Settings",
+            description="Click a button below to configure your settings.",
+            color=discord.Color.blue()
+        )
+
+        current_length = profile.get("response_length", "medium")
+        length_names = {"short": "Short", "medium": "Medium", "long": "Long"}
+        embed.add_field(name="📏 Current Response Length", value=length_names.get(current_length, current_length), inline=False)
+
+        custom_chars_allowed = limits["custom_chars"]
+        if custom_chars_allowed == -1:
+            embed.add_field(name="🎭 Custom Characters", value="Unlimited", inline=False)
+        else:
+            embed.add_field(name="🎭 Custom Characters", value=f"{custom_chars_allowed} max", inline=False)
+
+        view = discord.ui.View()
+
+        # Response length buttons
+        short_btn = discord.ui.Button(label="Short", style=discord.ButtonStyle.secondary if current_length != "short" else discord.ButtonStyle.success, emoji="📏")
+        short_btn.callback = lambda i: self._set_response_length(i, "short")
+        view.add_item(short_btn)
+
+        medium_btn = discord.ui.Button(label="Medium", style=discord.ButtonStyle.secondary if current_length != "medium" else discord.ButtonStyle.success, emoji="📏")
+        medium_btn.callback = lambda i: self._set_response_length(i, "medium")
+        view.add_item(medium_btn)
+
+        long_btn = discord.ui.Button(label="Long", style=discord.ButtonStyle.secondary if current_length != "long" else discord.ButtonStyle.success, emoji="📏")
+        long_btn.callback = lambda i: self._set_response_length(i, "long")
+        view.add_item(long_btn)
+
+        # Create custom character button
+        create_btn = discord.ui.Button(label="Create Character", style=discord.ButtonStyle.primary, emoji="🎭")
+        create_btn.callback = self._create_character_start
+        view.add_item(create_btn)
+
+        await interaction.followup.send(embed=embed, view=view)
+
+    async def _set_response_length(self, interaction: discord.Interaction, length: str):
+        await interaction.response.defer(thinking=True)
+        user_id = str(interaction.user.id)
+        self.db.update_profile(user_id, response_length=length)
+        length_names = {"short": "Short (1-2 paragraphs)", "medium": "Medium (2-4 paragraphs)", "long": "Long (4-6 paragraphs)"}
+        embed = discord.Embed(
+            title="✅ Setting Updated",
+            description=f"Response length set to: **{length_names.get(length, length)}**",
             color=discord.Color.green()
         )
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _create_character_start(self, interaction: discord.Interaction):
+        # Check if user can create custom characters
+        profile = self.db.get_profile(str(interaction.user.id))
+        limits = self.db.get_limits(str(interaction.user.id))
+        custom_chars_allowed = limits["custom_chars"]
+
+        if custom_chars_allowed == 0:
+            await interaction.response.send_message("❌ This feature requires **Standard** or **Premium** subscription. Use `/premium` for more info.", ephemeral=True)
+            return
+
+        # For Premium, check how many customs have been created
+        if custom_chars_allowed != -1:  # Not unlimited
+            from cogs.erp import ERPCog
+            erp_cog = interaction.client.get_cog("ERPCog")
+            if erp_cog:
+                characters = erp_cog._load_characters()
+                user_chars = [k for k, v in characters.items() if v.get("creator") == str(interaction.user.id)]
+                if len(user_chars) >= custom_chars_allowed:
+                    await interaction.response.send_message(f"❌ Limit of {custom_chars_allowed} custom characters reached for your subscription.", ephemeral=True)
+                    return
+
+        # Start the character creation modal
+        from cogs.erp import CharacterCreateModal
+        modal = CharacterCreateModal(interaction.client.get_cog("ERPCog").characters_file)
+        await interaction.response.send_modal(modal)
 
 
 async def setup(bot: commands.Bot):
