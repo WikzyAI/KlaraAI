@@ -57,8 +57,9 @@ class ERPBot(commands.Bot):
         print(f"[OK] Logged in as {self.user} (ID: {self.user.id})")
         await self.change_presence(
             activity=discord.Activity(
-                type=discord.ActivityType.playing,
-                name="ERP in DM | /help"
+                type=discord.ActivityType.streaming,
+                name="ERP",
+                url="https://twitch.tv/klaraai"
             )
         )
 
