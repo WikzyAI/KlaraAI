@@ -81,7 +81,7 @@ function updateThemeButton(theme) {
 const DISCORD_CLIENT_ID = '1500196432211349634';
 const DISCORD_REDIRECT_URI = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:8000'
-    : 'https://klara-ai.vercel.app';
+    : 'https://klaraai.vercel.app';
 const DISCORD_SCOPES = 'identify';
 
 function loginWithDiscord() {
