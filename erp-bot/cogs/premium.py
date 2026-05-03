@@ -103,17 +103,6 @@ class PremiumCog(commands.Cog):
         user_id = str(interaction.user.id)
         profile = self.db.get_profile(user_id)
 
-        # Check if user already has this subscription
-        current_sub = self.db.get_sub_type(user_id)
-        if current_sub == new_type:
-            embed = discord.Embed(
-                title="❌ Déjà abonné",
-                description=f"Tu as déjà l'abonnement **{config.SUBSCRIPTIONS[new_type]['name']}** !",
-                color=discord.Color.orange()
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-            return
-
         # Get credits from API
         credits_data = await asyncio.to_thread(get_credits, user_id)
         credits = credits_data.get("credits", 0)
@@ -128,15 +117,16 @@ class PremiumCog(commands.Cog):
                 # Update subscription type in local DB (but not credits)
                 self.db.update_profile(user_id, sub_type=new_type)
                 embed = discord.Embed(
-                    title=f"✅ Upgrade réussi !",
-                    description=f"Tu es maintenant abonné au forfait **{config.SUBSCRIPTIONS[new_type]['name']}** ! 💎\n"
-                                f"**{price} crédits** ont été débités.",
+                    title="✅ Achat réussi !",
+                    description=f"Félicitations ! Tu es maintenant abonné au forfait **{config.SUBSCRIPTIONS[new_type]['name']}** ! 💎\n"
+                                f"**{price} crédits** ont été débités.\n"
+                                f"Ton nouveau solde : **{result.get('new_balance', credits - price)} crédits**.",
                     color=discord.Color.gold()
                 )
             else:
                 embed = discord.Embed(
                     title="❌ Erreur",
-                    description="Une erreur est survenue lors du débit des crédits. Réessaye plus tard.",
+                    description="Une erreur est survenue lors du débit des crédits. Vérifie que l'API est configurée (API_SECRET).",
                     color=discord.Color.red()
                 )
         else:

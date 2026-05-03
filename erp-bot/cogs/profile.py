@@ -68,9 +68,12 @@ class ProfileCog(commands.Cog):
                 color=discord.Color.from_rgb(147, 112, 219)
             )
 
+        sub_type = profile.get("sub_type", "free")
+        sub_name = config.SUBSCRIPTIONS.get(sub_type, config.SUBSCRIPTIONS["free"])["name"]
+
         embed.add_field(name="Nom", value=profile.get("name") or "Non configuré", inline=True)
         embed.add_field(name="Âge", value=str(profile.get("age")) if profile.get("age") else "Non configuré", inline=True)
-        embed.add_field(name="Premium", value="✅ Oui" if profile.get("premium") else "❌ Non", inline=True)
+        embed.add_field(name="💎 Abonnement", value=f"**{sub_name}**", inline=True)
 
         if credits is not None:
             embed.add_field(
