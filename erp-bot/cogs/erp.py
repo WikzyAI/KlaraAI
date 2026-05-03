@@ -93,6 +93,12 @@ class ERPCog(commands.Cog):
         max_tokens = limits["max_tokens"]
         context_limit = limits["context"]
 
+        # Adjust max_tokens based on response_length setting
+        profile = self.profiles_db.get_profile(user_id)
+        response_length = profile.get("response_length", "medium")
+        length_multiplier = {"short": 0.5, "medium": 1.0, "long": 1.5}
+        max_tokens = int(max_tokens * length_multiplier.get(response_length, 1.0))
+
         session["messages"].append({"role": "user", "content": message.content})
         self.history_db.set_session(user_id, session)
         print(f"[DEBUG ERP] Message utilisateur ajouté à l'historique")

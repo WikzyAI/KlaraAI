@@ -91,6 +91,41 @@ class ProfileCog(commands.Cog):
         embed.set_footer(text="Utilise /profile name:<nom> age:<âge> description:<desc> pour modifier")
         return embed
 
+    @app_commands.command(name="settings", description="Configure les paramètres de réponse de l'IA")
+    @app_commands.describe(response_length="Longueur des réponses de l'IA")
+    @app_commands.choices(response_length=[
+        app_commands.Choice(name="Short - Réponses courtes (1-2 paragraphes)", value="short"),
+        app_commands.Choice(name="Medium - Réponses moyennes (2-4 paragraphes)", value="medium"),
+        app_commands.Choice(name="Long - Réponses longues (4-6 paragraphes)", value="long"),
+    ])
+    async def settings(self, interaction: discord.Interaction, response_length: str = None):
+        await interaction.response.defer(thinking=True)
+        user_id = interaction.user.id
+        profile = self.db.get_profile(user_id)
+
+        if response_length is None:
+            # Afficher les paramètres actuels
+            current = profile.get("response_length", "medium")
+            embed = discord.Embed(
+                title="⚙️ Paramètres actuels",
+                description="Utilise `/settings response_length:<choix>` pour changer.",
+                color=discord.Color.blue()
+            )
+            length_names = {"short": "Short (courtes)", "medium": "Medium (moyennes)", "long": "Long (longues)"}
+            embed.add_field(name="📏 Longueur des réponses", value=length_names.get(current, current), inline=False)
+            embed.add_field(name="Options", value="• `short` - 1-2 paragraphes\n• `medium` - 2-4 paragraphes\n• `long` - 4-6 paragraphes", inline=False)
+            await interaction.followup.send(embed=embed)
+            return
+
+        self.db.update_profile(user_id, response_length=response_length)
+        length_names = {"short": "Short (courtes)", "medium": "Medium (moyennes)", "long": "Long (longues)"}
+        embed = discord.Embed(
+            title="✅ Paramètre mis à jour",
+            description=f"Longueur des réponses définie sur : **{length_names.get(response_length, response_length)}**",
+            color=discord.Color.green()
+        )
+        await interaction.followup.send(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ProfileCog(bot))

@@ -55,6 +55,7 @@ class ProfilesDB(JSONDatabase):
             "daily_msgs_used": 0,
             "daily_sessions_used": 0,
             "last_reset": datetime.now().strftime("%Y-%m-%d"),
+            "response_length": "medium",
         }
         profile = self.get(str(user_id), default)
         for k, v in default.items():
