@@ -189,6 +189,18 @@ nav {
     transition: background 0.3s;
 }
 
+.nav-left {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
 .nav-brand {
     display: flex;
     align-items: center;

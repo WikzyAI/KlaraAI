@@ -28,30 +28,34 @@
          NAVIGATION
          ============================================ -->
     <nav>
-        <a href="index.html" class="nav-brand">💎 <span>KlaraAI</span></a>
-        <ul class="nav-links">
-            <li><a href="index.html" class="active" data-i18n="nav_home">Accueil</a></li>
-            <li><a href="pricing.html" data-i18n="nav_pricing">Tarifs</a></li>
-            <li><a href="buy-credits.html" data-i18n="nav_buy">Acheter</a></li>
-        </ul>
-        <select id="lang-selector" onchange="changeLanguage(this.value)" class="lang-selector">
-            <option value="fr">🇫🇷 Français</option>
-            <option value="en">🇺🇸 English</option>
-            <option value="es">🇪🇸 Español</option>
-            <option value="it">🇮🇹 Italiano</option>
-        </select>
-        <button class="theme-toggle" onclick="toggleTheme()" title="Changer de thème" id="theme-toggle-btn">🌙</button>
-        <div id="discord-auth" class="discord-auth">
-            <button class="btn btn-discord btn-sm" onclick="loginWithDiscord()" id="login-btn">
-                <span>🔒</span> <span data-i18n="nav_login">Se connecter</span>
-            </button>
+        <div class="nav-left">
+            <a href="index.html" class="nav-brand">💎 <span>KlaraAI</span></a>
+            <ul class="nav-links">
+                <li><a href="index.html" class="active" data-i18n="nav_home">Accueil</a></li>
+                <li><a href="pricing.html" data-i18n="nav_pricing">Tarifs</a></li>
+                <li><a href="buy-credits.html" data-i18n="nav_buy">Acheter</a></li>
+            </ul>
         </div>
-        <div id="discord-user" class="discord-user" style="display: none;">
-            <img id="user-avatar" class="user-avatar" src="" alt="Avatar">
-            <span id="user-name" class="user-name"></span>
-            <button class="btn-logout" onclick="logoutDiscord()" title="Se déconnecter">✕</button>
+        <div class="nav-right">
+            <select id="lang-selector" onchange="changeLanguage(this.value)" class="lang-selector">
+                <option value="fr">🇫🇷 Français</option>
+                <option value="en">🇺🇸 English</option>
+                <option value="es">🇪🇸 Español</option>
+                <option value="it">🇮🇹 Italiano</option>
+            </select>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Changer de thème" id="theme-toggle-btn">🌙</button>
+            <div id="discord-auth" class="discord-auth">
+                <button class="btn btn-discord btn-sm" onclick="loginWithDiscord()" id="login-btn">
+                    <span>🔒</span> <span data-i18n="nav_login">Se connecter</span>
+                </button>
+            </div>
+            <div id="discord-user" class="discord-user" style="display: none;">
+                <img id="user-avatar" class="user-avatar" src="" alt="Avatar">
+                <span id="user-name" class="user-name"></span>
+                <button class="btn-logout" onclick="logoutDiscord()" title="Se déconnecter">✕</button>
+            </div>
+            <a href="buy-credits.html" class="nav-cta" data-i18n="nav_buy_credits">Acheter des crédits</a>
         </div>
-        <a href="buy-credits.html" class="nav-cta" data-i18n="nav_buy_credits">Acheter des crédits</a>
     </nav>
 
     <!-- ============================================
