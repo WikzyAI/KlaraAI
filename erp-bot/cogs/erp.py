@@ -90,14 +90,25 @@ class ERPCog(commands.Cog):
 
         # Get subscription limits
         limits = self.profiles_db.get_limits(user_id)
-        max_tokens = limits["max_tokens"]
+        max_tokens_limit = limits["max_tokens"]  # Upper bound from config
         context_limit = limits["context"]
+        allowed_lengths = limits.get("allowed_lengths", ["short"])
 
         # Adjust max_tokens based on response_length setting
         profile = self.profiles_db.get_profile(user_id)
-        response_length = profile.get("response_length", "medium")
-        length_multiplier = {"short": 0.5, "medium": 1.0, "long": 1.5}
-        max_tokens = int(max_tokens * length_multiplier.get(response_length, 1.0))
+        response_length = profile.get("response_length", "short")
+
+        # Force response_length to allowed value
+        if response_length not in allowed_lengths:
+            response_length = allowed_lengths[0]  # Fallback to first allowed
+            self.profiles_db.update_profile(user_id, response_length=response_length)
+
+        # Token mapping: short=400, medium=800, long=1200
+        length_tokens = {"short": 400, "medium": 800, "long": 1200}
+        desired_tokens = length_tokens.get(response_length, 400)
+
+        # Cap by the upper bound from config
+        max_tokens = min(desired_tokens, max_tokens_limit)
 
         session["messages"].append({"role": "user", "content": message.content})
         self.history_db.set_session(user_id, session)

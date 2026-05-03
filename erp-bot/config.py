@@ -75,6 +75,7 @@ SUBSCRIPTIONS = {
         "max_tokens": 400,
         "context": 10,  # messages retenus dans l'historique
         "custom_chars": 0,
+        "allowed_lengths": ["short"],  # Seulement "short"
         "priority": False,
         "features": [
             "3 personnages de base",
@@ -93,6 +94,7 @@ SUBSCRIPTIONS = {
         "max_tokens": 800,
         "context": 20,
         "custom_chars": 2,
+        "allowed_lengths": ["short", "medium"],  # "short" et "medium"
         "priority": False,
         "features": [
             "3 personnages de base + 2 customs",
@@ -111,6 +113,7 @@ SUBSCRIPTIONS = {
         "max_tokens": 1200,
         "context": 50,
         "custom_chars": -1,    # illimité
+        "allowed_lengths": ["short", "medium", "long"],  # Tout est autorisé
         "priority": True,
         "features": [
             "Personnages illimités",

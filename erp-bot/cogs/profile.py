@@ -109,7 +109,7 @@ class ProfileCog(commands.Cog):
             color=discord.Color.blue()
         )
 
-        current_length = profile.get("response_length", "medium")
+        current_length = profile.get("response_length", "short")
         length_names = {"short": "Short", "medium": "Medium", "long": "Long"}
         embed.add_field(name="📏 Current Response Length", value=length_names.get(current_length, current_length), inline=False)
 
@@ -119,20 +119,27 @@ class ProfileCog(commands.Cog):
         else:
             embed.add_field(name="🎭 Custom Characters", value=f"{custom_chars_allowed} max", inline=False)
 
+        # Get allowed lengths from subscription
+        allowed_lengths = limits.get("allowed_lengths", ["short"])
+        embed.add_field(name="✅ Available Lengths", value=", ".join([length_names.get(l, l) for l in allowed_lengths]), inline=False)
+
         view = discord.ui.View()
 
-        # Response length buttons
-        short_btn = discord.ui.Button(label="Short", style=discord.ButtonStyle.secondary if current_length != "short" else discord.ButtonStyle.success, emoji="📏")
-        short_btn.callback = lambda i: self._set_response_length(i, "short")
-        view.add_item(short_btn)
+        # Response length buttons (only show allowed ones)
+        if "short" in allowed_lengths:
+            short_btn = discord.ui.Button(label="Short", style=discord.ButtonStyle.secondary if current_length != "short" else discord.ButtonStyle.success, emoji="📏")
+            short_btn.callback = lambda i: self._set_response_length(i, "short")
+            view.add_item(short_btn)
 
-        medium_btn = discord.ui.Button(label="Medium", style=discord.ButtonStyle.secondary if current_length != "medium" else discord.ButtonStyle.success, emoji="📏")
-        medium_btn.callback = lambda i: self._set_response_length(i, "medium")
-        view.add_item(medium_btn)
+        if "medium" in allowed_lengths:
+            medium_btn = discord.ui.Button(label="Medium", style=discord.ButtonStyle.secondary if current_length != "medium" else discord.ButtonStyle.success, emoji="📏")
+            medium_btn.callback = lambda i: self._set_response_length(i, "medium")
+            view.add_item(medium_btn)
 
-        long_btn = discord.ui.Button(label="Long", style=discord.ButtonStyle.secondary if current_length != "long" else discord.ButtonStyle.success, emoji="📏")
-        long_btn.callback = lambda i: self._set_response_length(i, "long")
-        view.add_item(long_btn)
+        if "long" in allowed_lengths:
+            long_btn = discord.ui.Button(label="Long", style=discord.ButtonStyle.secondary if current_length != "long" else discord.ButtonStyle.success, emoji="📏")
+            long_btn.callback = lambda i: self._set_response_length(i, "long")
+            view.add_item(long_btn)
 
         # Create custom character button
         create_btn = discord.ui.Button(label="Create Character", style=discord.ButtonStyle.primary, emoji="🎭")
@@ -144,6 +151,15 @@ class ProfileCog(commands.Cog):
     async def _set_response_length(self, interaction: discord.Interaction, length: str):
         await interaction.response.defer(thinking=True)
         user_id = str(interaction.user.id)
+
+        # Check if user is allowed to use this length
+        limits = self.db.get_limits(user_id)
+        allowed_lengths = limits.get("allowed_lengths", ["short"])
+
+        if length not in allowed_lengths:
+            await interaction.followup.send(f"❌ Your subscription doesn't allow **{length}** responses. Allowed: {', '.join(allowed_lengths)}", ephemeral=True)
+            return
+
         self.db.update_profile(user_id, response_length=length)
         length_names = {"short": "Short (1-2 paragraphs)", "medium": "Medium (2-4 paragraphs)", "long": "Long (4-6 paragraphs)"}
         embed = discord.Embed(
