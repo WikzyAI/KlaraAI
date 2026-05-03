@@ -8,9 +8,8 @@ import os
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-# API Base URL - change to your production URL when deploying
-# On Render, set API_BASE=http://localhost:10000 in environment variables
 API_BASE = os.getenv("API_BASE", "http://localhost:3000")
+API_SECRET = os.getenv("API_SECRET", "")
 
 def get_credits(discord_id: str) -> dict:
     """
@@ -20,7 +19,7 @@ def get_credits(discord_id: str) -> dict:
     url = f"{API_BASE}/api/credits?discord_id={discord_id}"
     try:
         req = Request(url, headers={"Accept": "application/json"})
-        with urlopen(req, timeout=5) as resp:
+        with urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             return data
     except (URLError, HTTPError, json.JSONDecodeError) as e:
@@ -35,14 +34,12 @@ def add_credits(discord_id: str, amount: int, username: str, pack_name: str = "B
     Returns: { success, new_balance }
     """
     url = f"{API_BASE}/api/credits/add"
-    api_secret = os.getenv("API_SECRET", "")
-
     payload = json.dumps({
         "discord_id": discord_id,
         "amount": amount,
         "pack_name": pack_name,
         "username": username,
-        "secret": api_secret
+        "secret": API_SECRET
     }).encode("utf-8")
 
     try:
@@ -50,10 +47,15 @@ def add_credits(discord_id: str, amount: int, username: str, pack_name: str = "B
             "Content-Type": "application/json",
             "Accept": "application/json"
         }, method="POST")
-        with urlopen(req, timeout=5) as resp:
+        with urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode("utf-8"))
+            print(f"[API] add_credits result: {data}")
             return data
-    except (URLError, HTTPError, json.JSONDecodeError) as e:
+    except HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        print(f"[API] HTTP Error adding credits for {discord_id}: {e.code} - {error_body}")
+        return {"success": False, "error": f"HTTP {e.code}: {error_body}"}
+    except (URLError, json.JSONDecodeError) as e:
         print(f"[API] Error adding credits for {discord_id}: {e}")
         return {"success": False, "error": str(e)}
 

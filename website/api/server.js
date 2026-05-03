@@ -184,9 +184,14 @@ app.post('/api/credits/add', async (req, res) => {
         }
         discordId = user.id;
         username = user.username;
-    } else if (req.body.discord_id && req.body.secret === process.env.API_SECRET) {
-        discordId = req.body.discord_id;
-        username = req.body.username || 'Unknown';
+    } else if (req.body.discord_id && req.body.secret) {
+        if (req.body.secret === process.env.API_SECRET) {
+            discordId = req.body.discord_id;
+            username = req.body.username || 'Unknown';
+        } else {
+            console.error(`[API] Invalid secret provided. Expected: ${process.env.API_SECRET ? 'SET' : 'NOT SET'}, Got: ${req.body.secret ? 'provided' : 'empty'}`);
+            return res.status(401).json({ error: 'Invalid secret', success: false });
+        }
     } else {
         return res.status(401).json({ error: 'Unauthorized' });
     }
