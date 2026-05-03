@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KlaraAI - ERP Discord Bot | Roleplay Érotique Privé</title>
+    <meta name="description" content="KlaraAI - Bot Discord de RP érotique (ERP) privé. 3 personnages, système d'abonnement, IA avancée. 18+ uniquement.">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- ============================================
+         AGE VERIFICATION (18+)
+         ============================================ -->
+    <div id="age-verify">
+        <div class="age-modal">
+            <h2 data-i18n="age_title">⚠️ Accès Réservé</h2>
+            <p data-i18n="age_desc">Ce site et ce bot sont strictement réservés aux personnes de <strong>18 ans et plus</strong>.<br>
+            <span data-i18n="age_18plus">Le contenu est à caractère érotique/pornographique.</span></p>
+            <div class="btn-group">
+                <button class="btn btn-danger" onclick="denyAge()" data-i18n="age_deny">J'ai moins de 18 ans</button>
+                <button class="btn btn-success" onclick="confirmAge()" data-i18n="age_confirm">J'ai 18 ans ou plus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================
+         NAVIGATION
+         ============================================ -->
+    <nav>
+        <a href="index.html" class="nav-brand">💎 <span>KlaraAI</span></a>
+        <ul class="nav-links">
+            <li><a href="index.html" class="active" data-i18n="nav_home">Accueil</a></li>
+            <li><a href="pricing.html" data-i18n="nav_pricing">Tarifs</a></li>
+            <li><a href="buy-credits.html" data-i18n="nav_buy">Acheter</a></li>
+        </ul>
+        <select id="lang-selector" onchange="changeLanguage(this.value)" class="lang-selector">
+            <option value="fr">🇫🇷 Français</option>
+            <option value="en">🇺🇸 English</option>
+            <option value="es">🇪🇸 Español</option>
+            <option value="it">🇮🇹 Italiano</option>
+        </select>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Changer de thème" id="theme-toggle-btn">🌙</button>
+        <div id="discord-auth" class="discord-auth">
+            <button class="btn btn-discord btn-sm" onclick="loginWithDiscord()" id="login-btn">
+                <span>🔒</span> <span data-i18n="nav_login">Se connecter</span>
+            </button>
+        </div>
+        <div id="discord-user" class="discord-user" style="display: none;">
+            <img id="user-avatar" class="user-avatar" src="" alt="Avatar">
+            <span id="user-name" class="user-name"></span>
+            <button class="btn-logout" onclick="logoutDiscord()" title="Se déconnecter">✕</button>
+        </div>
+        <a href="buy-credits.html" class="nav-cta" data-i18n="nav_buy_credits">Acheter des crédits</a>
+    </nav>
+
+    <!-- ============================================
+         HERO SECTION
+         ============================================ -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1 data-i18n="hero_title">KlaraAI</h1>
+            <p data-i18n="hero_desc">Bot Discord d'ERP privé • Roleplay érotique avec IA • 18+</p>
+            <div class="hero-buttons">
+                <a href="pricing.html" class="btn btn-primary btn-lg" data-i18n="hero_btn_pricing">Voir les tarifs</a>
+                <a href="buy-credits.html" class="btn btn-secondary btn-lg" data-i18n="hero_btn_buy">Acheter des crédits</a>
+                <a href="https://discord.com/api/oauth2/authorize?client_id=1500196432211349634&permissions=414464724032&scope=bot" class="btn btn-discord btn-lg" data-i18n="hero_btn_invite">🤖 Inviter le bot</a>
+                <button onclick="showCommands()" class="btn btn-secondary btn-lg" data-i18n="hero_btn_commands">📋 Commandes</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         FEATURES SECTION
+         ============================================ -->
+    <section class="features">
+        <h2 class="section-title" data-i18n="feat_title">Fonctionnalités</h2>
+        <p class="section-subtitle" data-i18n="feat_subtitle">Un bot Discord privé qui fonctionne exclusivement en messages privés (DM)</p>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🎭</div>
+                <h3 data-i18n="feat_3chars_title">3 Personnages Uniques</h3>
+                <p data-i18n="feat_3chars_desc">Lilith (Succube), Isabelle (Belle-mère), Chloé (Belle-sœur). Chaque perso a sa propre personnalité et son style.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3 data-i18n="feat_ia_title">IA Avancée</h3>
+                <p data-i18n="feat_ia_desc">Réponses générées par IA (llama-3.3-70b) avec contexte mémorisé jusqu'à 50 messages.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💬</div>
+                <h3 data-i18n="feat_auto_title">Réponse Automatique</h3>
+                <p data-i18n="feat_auto_desc">Une fois la séance lancée avec /erp start, le bot répond automatiquement à tous tes messages.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3 data-i18n="feat_private_title">100% Privé</h3>
+                <p data-i18n="feat_private_desc">Le bot fonctionne exclusivement en DM (messages privés). Aucun serveur, aucune trace publique.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">✨</div>
+                <h3 data-i18n="feat_actions_title">Actions Formatées</h3>
+                <p data-i18n="feat_actions_desc">Les actions sont écrites entre astérisques : *elle s'approche de toi* pour une immersion totale.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔞</div>
+                <h3 data-i18n="feat_nsfw_title">NSFW Total</h3>
+                <p data-i18n="feat_nsfw_desc">Contenu érotique explicite autorisé et encouragé en DM. Aucune censure, aucune restriction.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         HOW IT WORKS SECTION
+         ============================================ -->
+    <section class="how-it-works">
+        <h2 class="section-title" data-i18n="how_title">Comment ça marche ?</h2>
+        <p class="section-subtitle" data-i18n="how_subtitle">3 étapes simples pour commencer ton RP érotique</p>
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3 data-i18n="step1_title">Ajoute le bot</h3>
+                <p data-i18n="step1_desc">Invite KlaraAI en DM sur Discord. Aucun serveur requis, tout se passe en privé.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3 data-i18n="step2_title">Lance une séance</h3>
+                <p data-i18n="step2_desc">Utilise /erp start <personnage> pour commencer avec Lilith, Isabelle ou Chloé.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3 data-i18n="step3_title">Profite</h3>
+                <p data-i18n="step3_desc">Écris tes messages, le bot répond automatiquement avec des réponses immersives et détaillées.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         DISCORD BOT CARD
+         ============================================ -->
+    <section class="features">
+        <div class="bot-card">
+            <h3 data-i18n="bot_title">🤖 Utiliser le bot sur Discord</h3>
+            <p data-i18n="bot_desc">Ajoute KlaraAI à tes contacts Discord et envoie-lui /help en DM pour commencer.<br>Le bot ne fonctionne qu'en messages privés (DM).</p>
+            <div class="bot-features">
+                <div class="bot-feature" data-i18n="bot_help">📝 /help - Aide</div>
+                <div class="bot-feature" data-i18n="bot_profile">👤 /profile - Ton profil</div>
+                <div class="bot-feature" data-i18n="bot_premium">💎 /premium - Abonnement</div>
+                <div class="bot-feature" data-i18n="bot_start">🎭 /erp start - Commencer</div>
+                <div class="bot-feature" data-i18n="bot_end">🛑 /erp end - Terminer</div>
+                <div class="bot-feature" data-i18n="bot_list">📋 /erp list - Personnages</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         PRICING PREVIEW
+         ============================================ -->
+    <section class="pricing">
+        <h2 class="section-title" data-i18n="pricing_title">Nos Tarifs</h2>
+        <p class="section-subtitle" data-i18n="pricing_subtitle">100 crédits = 1 USD • Paiement sécurisé • Annulable à tout moment</p>
+        <div class="pricing-grid">
+            <!-- Free Trial -->
+            <div class="pricing-card">
+                <h3 data-i18n="free_title">Free Trial</h3>
+                <div class="price" data-i18n="free_full">0 /mois</div>
+                <div class="credits" data-i18n="free_credits">0 crédits / mois</div>
+                <ul class="pricing-features">
+                    <li data-i18n="f_3chars">3 personnages de base</li>
+                    <li data-i18n="f_20msg">20 messages/jour</li>
+                    <li data-i18n="f_2sess">2 séances/jour</li>
+                    <li data-i18n="f_ctx10">Context: 10 messages</li>
+                    <li data-i18n="f_basic_resp">Réponses de base</li>
+                </ul>
+                <a href="pricing.html" class="btn btn-secondary" data-i18n="btn_start_free">Commencer</a>
+            </div>
+
+            <!-- Standard -->
+            <div class="pricing-card featured">
+                <h3 data-i18n="standard_title">Standard</h3>
+                <div class="price" data-i18n="standard_full">1600 crédits /mois</div>
+                <div class="credits" data-i18n="standard_eur">~16$ / 15€</div>
+                <ul class="pricing-features">
+                    <li data-i18n="f_3plus2">3 personnages de base + 2 customs</li>
+                    <li data-i18n="f_100msg">100 messages/jour</li>
+                    <li data-i18n="f_5sess">5 séances/jour</li>
+                    <li data-i18n="f_ctx20">Context: 20 messages</li>
+                    <li data-i18n="f_normal_resp">Réponses IA normales</li>
+                </ul>
+                <a href="buy-credits.html" class="btn btn-primary" data-i18n="btn_buy">Acheter</a>
+            </div>
+
+            <!-- Premium -->
+            <div class="pricing-card">
+                <h3 data-i18n="premium_title">Premium</h3>
+                <div class="price" data-i18n="premium_full">3200 crédits /mois</div>
+                <div class="credits" data-i18n="premium_eur">~32$ / 30€</div>
+                <ul class="pricing-features">
+                    <li data-i18n="f_unlimited_chars">Personnages illimités</li>
+                    <li data-i18n="f_unlimited_msg">Messages illimités</li>
+                    <li data-i18n="f_unlimited_sess">Séances illimitées</li>
+                    <li data-i18n="f_ctx50">Context: 50 messages</li>
+                    <li data-i18n="f_priority">Réponses IA prioritaires</li>
+                </ul>
+                <a href="buy-credits.html" class="btn btn-primary" data-i18n="btn_buy">Acheter</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         FOOTER
+         ============================================ -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4 data-i18n="nav_home">KlaraAI</h4>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;" data-i18n="footer_desc">Bot Discord d'ERP privé pour adultes.</p>
+                <p class="footer-warning" data-i18n="footer_18plus">⚠️ Site et bot réservés aux 18+ ans</p>
+            </div>
+            <div class="footer-section">
+                <h4 data-i18n="footer_links">Liens</h4>
+                <a href="index.html" data-i18n="nav_home">Accueil</a>
+                <a href="pricing.html" data-i18n="nav_pricing">Tarifs</a>
+                <a href="buy-credits.html" data-i18n="nav_buy">Acheter</a>
+            </div>
+            <div class="footer-section">
+                <h4 data-i18n="footer_legal">Légal</h4>
+                <a href="#" data-i18n="footer_terms">Conditions d'utilisation</a>
+                <a href="#" data-i18n="footer_privacy">Politique de confidentialité</a>
+                <a href="#" data-i18n="footer_legal_notice">Mentions légales</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p data-i18n="footer_copyright">© 2026 KlaraAI. Tous droits réservés. Site réservé aux adultes (18+).</p>
+        </div>
+    </footer>
+
+    <!-- ============================================
+         COMMANDS MODAL
+         ============================================ -->
+    <div id="commands-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>📋 Commandes du bot</h3>
+                <button class="modal-close" onclick="closeCommands()">✕</button>
+            </div>
+            <div class="commands-grid">
+                <div class="command-item">
+                    <h4>/help</h4>
+                    <p>Affiche l'aide et la liste des commandes disponibles</p>
+                </div>
+                <div class="command-item">
+                    <h4>/profile</h4>
+                    <p>Affiche ton profil, tes crédits et ton statut d'abonnement</p>
+                </div>
+                <div class="command-item">
+                    <h4>/premium</h4>
+                    <p>Informations sur les abonnements Premium et codes d'activation</p>
+                </div>
+                <div class="command-item">
+                    <h4>/erp start &lt;personnage&gt;</h4>
+                    <p>Lance une séance RP avec un personnage (Lilith, Isabelle, Chloé)</p>
+                </div>
+                <div class="command-item">
+                    <h4>/erp end</h4>
+                    <p>Met fin à la séance RP en cours</p>
+                </div>
+                <div class="command-item">
+                    <h4>/erp list</h4>
+                    <p>Affiche la liste des personnages disponibles</p>
+                </div>
+                <div class="command-item">
+                    <h4>/erp custom &lt;nom&gt; &lt;personnalité&gt;</h4>
+                    <p>Crée un personnage personnalisé (Premium requis)</p>
+                </div>
+                <div class="command-item">
+                    <h4>/credits check</h4>
+                    <p>Vérifie ton solde de crédits actuel</p>
+                </div>
+                <div class="command-item">
+                    <h4>/credits history</h4>
+                    <p>Affiche l'historique de tes transactions de crédits</p>
+                </div>
+                <div class="command-item">
+                    <h4>/settings</h4>
+                    <p>Configure les paramètres de ton compte (langue, préférences)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================
+         SCRIPTS
+         ============================================ -->
+    <script src="js/config.js"></script>
+    <script src="js/translations.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

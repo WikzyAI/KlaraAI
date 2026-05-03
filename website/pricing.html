@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tarifs - KlaraAI | ERP Discord Bot</title>
+    <meta name="description" content="Découvre les tarifs de KlaraAI. 100 crédits = 1 USD. Forfaits Free, Standard et Premium.">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav>
+        <a href="index.html" class="nav-brand">💎 <span>KlaraAI</span></a>
+        <ul class="nav-links">
+            <li><a href="index.html" data-i18n="nav_home">Accueil</a></li>
+            <li><a href="pricing.html" class="active" data-i18n="nav_pricing">Tarifs</a></li>
+            <li><a href="buy-credits.html" data-i18n="nav_buy">Acheter</a></li>
+        </ul>
+        <select id="lang-selector" onchange="changeLanguage(this.value)" class="lang-selector">
+            <option value="fr">🇫🇷 Français</option>
+            <option value="en">🇺🇸 English</option>
+            <option value="es">🇪🇸 Español</option>
+            <option value="it">🇮🇹 Italiano</option>
+        </select>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Changer de thème" id="theme-toggle-btn">🌙</button>
+        <div id="discord-auth" class="discord-auth">
+            <button class="btn btn-discord btn-sm" onclick="loginWithDiscord()" id="login-btn">
+                <span>🔒</span> <span data-i18n="nav_login">Se connecter</span>
+            </button>
+        </div>
+        <div id="discord-user" class="discord-user" style="display: none;">
+            <img id="user-avatar" class="user-avatar" src="" alt="Avatar">
+            <span id="user-name" class="user-name"></span>
+            <button class="btn-logout" onclick="logoutDiscord()" title="Se déconnecter">✕</button>
+        </div>
+        <a href="buy-credits.html" class="nav-cta" data-i18n="nav_buy_credits">Acheter des crédits</a>
+    </nav>
+
+    <!-- Pricing Section -->
+    <section class="pricing" style="padding-top: 120px;">
+        <h2 class="section-title" data-i18n="pricing_title">Nos Tarifs</h2>
+        <p class="section-subtitle" data-i18n="pricing_subtitle">100 crédits = 1 USD • Paiement sécurisé • Annulable à tout moment</p>
+
+        <!-- Credits Info -->
+        <div class="credits-info container">
+            <p><strong data-i18n="pricing_credits_info">💡 Le système de crédits :</strong><br>
+            <span data-i18n="pricing_credits_desc">Le bot utilise un système de crédits.<br>100 crédits = 1 USD. Les abonnements sont débités en crédits chaque mois.</span></p>
+        </div>
+
+        <div class="pricing-grid">
+            <!-- Free Trial -->
+            <div class="pricing-card">
+                <h3 data-i18n="free_title">Free Trial</h3>
+                <div class="price"><span data-i18n="free_price">0</span><span data-i18n="free_per">/mois</span></div>
+                <div class="credits" data-i18n="free_credits">0 crédits / mois</div>
+                <ul class="pricing-features">
+                    <li data-i18n="f_3chars">3 personnages de base</li>
+                    <li data-i18n="f_20msg">20 messages/jour</li>
+                    <li data-i18n="f_2sess">2 séances/jour</li>
+                    <li data-i18n="f_ctx10">Context: 10 messages</li>
+                    <li data-i18n="f_basic_resp">Réponses de base</li>
+                    <li class="disabled" data-i18n="f_no_custom">Personnages customs</li>
+                    <li class="disabled" data-i18n="f_no_priority">Réponses prioritaire</li>
+                </ul>
+                <a href="buy-credits.html" class="btn btn-secondary" data-i18n="btn_start_free">Commencer gratuitement</a>
+            </div>
+
+            <!-- Standard -->
+            <div class="pricing-card featured">
+                <h3 data-i18n="standard_title">Standard</h3>
+                <div class="price"><span data-i18n="standard_price">1600</span><span data-i18n="standard_per"> crédits/mois</span></div>
+                <div class="credits" data-i18n="standard_eur">~16$ / 15€</div>
+                <ul class="pricing-features">
+                    <li data-i18n="f_3plus2">3 personnages de base + 2 customs</li>
+                    <li data-i18n="f_100msg">100 messages/jour</li>
+                    <li data-i18n="f_5sess">5 séances/jour</li>
+                    <li data-i18n="f_ctx20">Context: 20 messages</li>
+                    <li data-i18n="f_normal_resp">Réponses IA normales</li>
+                    <li data-i18n="f_2custom">2 personnages customs max</li>
+                    <li class="disabled" data-i18n="f_no_priority">Réponses prioritaire</li>
+                </ul>
+                <a href="buy-credits.html" class="btn btn-primary" data-i18n="btn_buy">Acheter</a>
+            </div>
+
+            <!-- Premium -->
+            <div class="pricing-card">
+                <h3 data-i18n="premium_title">Premium</h3>
+                <div class="price"><span data-i18n="premium_price">3200</span><span data-i18n="premium_per"> crédits/mois</span></div>
+                <div class="credits" data-i18n="premium_eur">~32$ / 30€</div>
+                <ul class="pricing-features">
+                    <li data-i18n="f_unlimited_chars">Personnages illimités</li>
+                    <li data-i18n="f_unlimited_msg">Messages illimités</li>
+                    <li data-i18n="f_unlimited_sess">Séances illimitées</li>
+                    <li data-i18n="f_ctx50">Context: 50 messages</li>
+                    <li data-i18n="f_priority">Réponses IA prioritaires</li>
+                    <li data-i18n="f_unlimited_custom">Personnages customs illimités</li>
+                    <li data-i18n="f_adv_profile">Configuration profil avancée</li>
+                </ul>
+                <a href="buy-credits.html" class="btn btn-primary" data-i18n="btn_buy">Acheter</a>
+            </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="container mt-2">
+            <div class="alert alert-info">
+                <strong data-i18n="tech_title">📊 Détails techniques :</strong><br>
+                <span data-i18n="tech_ctx"></span><br>
+                <span data-i18n="tech_daily"></span><br>
+                <span data-i18n="tech_tokens"></span><br>
+                <span data-i18n="tech_custom"></span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4 data-i18n="nav_home">KlaraAI</h4>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;" data-i18n="footer_desc">Bot Discord d'ERP privé pour adultes.</p>
+                <p class="footer-warning" data-i18n="footer_18plus">⚠️ Site et bot réservés aux 18+ ans</p>
+            </div>
+            <div class="footer-section">
+                <h4 data-i18n="footer_links">Liens</h4>
+                <a href="index.html" data-i18n="nav_home">Accueil</a>
+                <a href="pricing.html" data-i18n="nav_pricing">Tarifs</a>
+                <a href="buy-credits.html" data-i18n="nav_buy">Acheter</a>
+            </div>
+            <div class="footer-section">
+                <h4 data-i18n="footer_legal">Légal</h4>
+                <a href="#" data-i18n="footer_terms">Conditions d'utilisation</a>
+                <a href="#" data-i18n="footer_privacy">Politique de confidentialité</a>
+                <a href="#" data-i18n="footer_legal_notice">Mentions légales</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p data-i18n="footer_copyright">© 2026 KlaraAI. Tous droits réservés. Site réservé aux adultes (18+).</p>
+        </div>
+    </footer>
+
+    <script src="js/translations.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acheter des Crédits - KlaraAI | 100 crédits = 1 USD</title>
+    <meta name="description" content="Achetez des crédits pour KlaraAI. 100 crédits = 1 USD. Abonnements Standard et Premium.">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav>
+        <a href="index.html" class="nav-brand">💎 <span>KlaraAI</span></a>
+        <ul class="nav-links">
+            <li><a href="index.html" data-i18n="nav_home">Accueil</a></li>
+            <li><a href="pricing.html" data-i18n="nav_pricing">Tarifs</a></li>
+            <li><a href="buy-credits.html" class="active" data-i18n="nav_buy">Acheter</a></li>
+        </ul>
+        <select id="lang-selector" onchange="changeLanguage(this.value)" class="lang-selector">
+            <option value="fr">🇫🇷 Français</option>
+            <option value="en">🇺🇸 English</option>
+            <option value="es">🇪🇸 Español</option>
+            <option value="it">🇮🇹 Italiano</option>
+        </select>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Changer de thème" id="theme-toggle-btn">🌙</button>
+        <div id="discord-auth" class="discord-auth">
+            <button class="btn btn-discord btn-sm" onclick="loginWithDiscord()" id="login-btn">
+                <span>🔒</span> <span data-i18n="nav_login">Se connecter</span>
+            </button>
+        </div>
+        <div id="discord-user" class="discord-user" style="display: none;">
+            <img id="user-avatar" class="user-avatar" src="" alt="Avatar">
+            <span id="user-name" class="user-name"></span>
+            <button class="btn-logout" onclick="logoutDiscord()" title="Se déconnecter">✕</button>
+        </div>
+        <a href="buy-credits.html" class="nav-cta" data-i18n="nav_buy_credits">Acheter des crédits</a>
+    </nav>
+
+    <!-- User Credits Display -->
+    <div id="user-credits-bar" class="user-credits-bar" style="display: none; text-align: center; padding: 80px 2rem 1rem; background: var(--darker);">
+        <p style="color: var(--text-muted);">Solde de crédits pour <strong id="credits-username"></strong> : <strong id="credits-balance" style="color: var(--primary);">0</strong> crédits</p>
+    </div>
+
+    <!-- Shop Section -->
+    <section class="shop" style="padding-top: 120px;">
+        <h2 class="section-title" data-i18n="shop_title">Acheter des Crédits</h2>
+        <p class="section-subtitle" data-i18n="shop_subtitle">100 crédits = 1 USD • Paiement sécurisé • Livraison instantanée</p>
+
+        <!-- Not Logged In Warning -->
+        <div id="login-warning" class="alert alert-warning container" style="display: none;">
+            <strong>⚠️</strong> <span data-i18n="shop_login_required">Vous devez vous connecter avec Discord pour acheter des crédits.</span>
+            <button class="btn btn-discord btn-sm" onclick="loginWithDiscord()" style="margin-left: 1rem;">🔒 <span data-i18n="nav_login">Se connecter</span></button>
+        </div>
+
+        <!-- Credits Info -->
+        <div class="credits-info container">
+            <p><strong data-i18n="shop_example">💡 Exemple de conversion :</strong><br>
+            <span data-i18n="shop_example_desc">100 crédits = 1 USD • 500 crédits = 5 USD • 1000 crédits = 10 USD<br><small>Les abonnements coutent 1600 crédits/mois (Standard) ou 3200 crédits/mois (Premium).</small></span></p>
+        </div>
+
+        <!-- Subscription Packs -->
+        <h3 style="text-align: center; color: var(--primary); margin-bottom: 2rem;" data-i18n="sub_standard">Abonnements Mensuels</h3>
+        <div class="shop-grid">
+            <div class="shop-card">
+                <h3 data-i18n="sub_standard_2">Standard (1 mois)</h3>
+                <div class="shop-price" data-i18n="sub_standard_1600">1600 crédits</div>
+                <div class="shop-credits" data-i18n="standard_eur">~16$ / 15€</div>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                    • 100 messages/jour<br>
+                    • 5 séances/jour<br>
+                    • 2 personnages customs<br>
+                    • Context: 20 messages
+                </p>
+                <button class="btn btn-primary" onclick="buyCredits(1600, 'Standard')" data-i18n="btn_buy">Acheter</button>
+            </div>
+
+            <div class="shop-card" style="border-color: var(--primary);">
+                <h3 data-i18n="sub_premium_2">Premium (1 mois)</h3>
+                <div class="shop-price" data-i18n="sub_premium_3200">3200 crédits</div>
+                <div class="shop-credits" data-i18n="premium_eur">~32$ / 30€</div>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+                    • Messages illimités<br>
+                    • Séances illimitées<br>
+                    • Personnages illimités<br>
+                    • Context: 50 messages<br>
+                    • Priorité IA
+                </p>
+                <button class="btn btn-primary" onclick="buyCredits(3200, 'Premium')" data-i18n="btn_buy">Acheter</button>
+            </div>
+        </div>
+
+        <!-- Credit Packs -->
+        <h3 style="text-align: center; color: var(--primary); margin: 3rem 0 2rem;" data-i18n="shop_title">Packs de Crédits (Pay-as-you-go)</h3>
+        <div class="shop-grid">
+            <div class="shop-card">
+                <h3 data-i18n="pack_starter">Starter Pack</h3>
+                <div class="shop-price" data-i18n="pack_starter_100">100 crédits</div>
+                <div class="shop-credits" data-i18n="pack_starter_price">1 USD / 0.90€</div>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;" data-i18n="pack_starter_desc">
+                    Suffisant pour environ 5 séances complètes
+                </p>
+                <button class="btn btn-secondary" onclick="buyCredits(100, 'Starter')" data-i18n="btn_buy">Acheter</button>
+            </div>
+
+            <div class="shop-card">
+                <h3 data-i18n="pack_popular">Popular Pack</h3>
+                <div class="shop-price" data-i18n="pack_popular_500">500 crédits</div>
+                <div class="shop-credits" data-i18n="pack_popular_price">5 USD / 4.50€</div>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;" data-i18n="pack_popular_desc">
+                    Suffisant pour environ 25 séances complètes
+                </p>
+                <button class="btn btn-primary" onclick="buyCredits(500, 'Popular')" data-i18n="btn_buy">Acheter</button>
+            </div>
+
+            <div class="shop-card">
+                <h3 data-i18n="pack_pro">Pro Pack</h3>
+                <div class="shop-price" data-i18n="pack_pro_1000">1000 crédits</div>
+                <div class="shop-credits" data-i18n="pack_pro_price">10 USD / 9€</div>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;" data-i18n="pack_pro_desc">
+                    Suffisant pour environ 50 séances complètes
+                </p>
+                <button class="btn btn-secondary" onclick="buyCredits(1000, 'Pro')" data-i18n="btn_buy">Acheter</button>
+            </div>
+
+            <div class="shop-card">
+                <h3 data-i18n="pack_elite">Elite Pack</h3>
+                <div class="shop-price" data-i18n="pack_elite_5000">5000 crédits</div>
+                <div class="shop-credits" data-i18n="pack_elite_price">50 USD / 45€</div>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;" data-i18n="pack_elite_desc">
+                    Suffisant pour environ 250 séances complètes
+                </p>
+                <button class="btn btn-primary" onclick="buyCredits(5000, 'Elite')" data-i18n="btn_buy">Acheter</button>
+            </div>
+        </div>
+
+        <!-- How to use -->
+        <div class="container mt-2">
+            <div class="alert alert-info">
+                <h4 style="color: #3498db; margin-bottom: 1rem;" data-i18n="how_it_works_title">📝 Comment ça marche ?</h4>
+                <p data-i18n="how_it_works_desc1">1. <strong>Connectez-vous</strong> avec Discord en haut à droite</p>
+                <p data-i18n="how_it_works_desc2">2. <strong>Achetez des crédits</strong> - ils seront liés à votre compte Discord</p>
+                <p data-i18n="how_it_works_desc3">3. <strong>Utilisez /premium</strong> dans Discord pour voir votre solde</p>
+                <p data-i18n="how_it_works_desc4">4. <strong>Profitez !</strong> Le bot débite automatiquement les crédits selon votre abonnement</p>
+            </div>
+
+            <div class="alert alert-warning">
+                <strong data-i18n="note_title">⚠️ Note :</strong> <span data-i18n="note_desc">Le système de paiement est en cours de développement.<br>Pour l'instant, les crédits sont simulés. Le paiement réel sera ajouté prochainement.</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4 data-i18n="nav_home">KlaraAI</h4>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;" data-i18n="footer_desc">Bot Discord d'ERP privé pour adultes.</p>
+                <p class="footer-warning" data-i18n="footer_18plus">⚠️ Site et bot réservés aux 18+ ans</p>
+            </div>
+            <div class="footer-section">
+                <h4 data-i18n="footer_links">Liens</h4>
+                <a href="index.html" data-i18n="nav_home">Accueil</a>
+                <a href="pricing.html" data-i18n="nav_pricing">Tarifs</a>
+                <a href="buy-credits.html" data-i18n="nav_buy">Acheter</a>
+            </div>
+            <div class="footer-section">
+                <h4 data-i18n="footer_legal">Légal</h4>
+                <a href="#" data-i18n="footer_terms">Conditions d'utilisation</a>
+                <a href="#" data-i18n="footer_privacy">Politique de confidentialité</a>
+                <a href="#" data-i18n="footer_legal_notice">Mentions légales</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p data-i18n="footer_copyright">© 2026 KlaraAI. Tous droits réservés. Site réservé aux adultes (18+).</p>
+        </div>
+    </footer>
+
+    <script src="js/translations.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
