@@ -24,7 +24,9 @@ const translations = {
         hero_btn_pricing: "Voir les tarifs",
         hero_btn_buy: "Acheter des crédits",
         hero_btn_invite: "🤖 Inviter le bot",
+        hero_btn_chat: "💬 Discuter sur Discord",
         hero_btn_commands: "📋 Commandes",
+        hero_tip: "💡 <strong>Astuce :</strong> clique sur <em>Discuter sur Discord</em> puis envoie <code>/help</code> en DM. Pas besoin de serveur, tout se passe en messages privés.",
 
         // Features
         feat_title: "Fonctionnalités",
@@ -212,7 +214,9 @@ const translations = {
         hero_btn_pricing: "View Pricing",
         hero_btn_buy: "Buy Credits",
         hero_btn_invite: "🤖 Invite Bot",
+        hero_btn_chat: "💬 Chat on Discord",
         hero_btn_commands: "📋 Commands",
+        hero_tip: "💡 <strong>Tip:</strong> click <em>Chat on Discord</em>, then send <code>/help</code> in DM. No server required — everything happens in private messages.",
 
         // Features
         feat_title: "Features",
