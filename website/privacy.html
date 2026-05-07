@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - KlaraAI</title>
+    <meta name="description" content="KlaraAI Privacy Policy. How we collect, use, and protect your data.">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-left">
+            <a href="index.html" class="nav-brand">✦ <span>KlaraAI</span></a>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="pricing.html">Pricing</a></li>
+                <li><a href="buy-credits.html">Buy Credits</a></li>
+            </ul>
+        </div>
+        <div class="nav-right">
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="theme-toggle-btn">🌙</button>
+            <a href="buy-credits.html" class="nav-cta">Buy Credits</a>
+        </div>
+    </nav>
+
+    <main class="legal-page">
+        <h1>Privacy Policy</h1>
+        <p class="legal-meta">Last updated: <span class="placeholder">&lt;DATE&gt;</span></p>
+
+        <div class="legal-note">
+            <strong>📌 Heads up:</strong> placeholders <span class="placeholder">&lt;...&gt;</span> must be replaced with your real
+            legal/contact information. This is a template — review with a lawyer if you operate in the EU/UK (GDPR/UK-DPA),
+            California (CCPA), or similar regions.
+        </div>
+
+        <p>This Privacy Policy explains how <span class="placeholder">&lt;LEGAL ENTITY&gt;</span> ("we", "us") collects, uses,
+        and protects information when you use the KlaraAI website and Discord bot ("the service").</p>
+
+        <h2>1. Data We Collect</h2>
+
+        <h3>1.1 From Discord</h3>
+        <p>When you log in via Discord OAuth or use the bot, we receive:</p>
+        <ul>
+            <li><strong>Discord User ID</strong> (numeric, persistent identifier)</li>
+            <li><strong>Username</strong> and <strong>avatar URL</strong></li>
+            <li><strong>Account creation date</strong> (used for anti-fraud age checks)</li>
+        </ul>
+        <p>We do <strong>not</strong> request your email, phone, or friends list.</p>
+
+        <h3>1.2 In-Bot Data</h3>
+        <p>Created by you when using the bot:</p>
+        <ul>
+            <li>Profile fields you choose to set (display name, age, free-text description) — used to personalize roleplay</li>
+            <li>Custom character definitions (name, description, personality)</li>
+            <li>Active session message history (transient, kept while a session is active)</li>
+            <li>Long-term memory facts extracted from sessions you ended (used to keep continuity across sessions)</li>
+            <li>Usage counters: daily messages, daily sessions, streak count, referral activity</li>
+            <li>Preferences (response length)</li>
+        </ul>
+
+        <h3>1.3 Payment Data</h3>
+        <p>Payments are processed by <strong>Stripe</strong>. We never see or store your card number, CVV, or banking details.
+        Stripe shares with us only the payment status, the amount, and the metadata we attached (Discord ID, pack name).</p>
+
+        <h3>1.4 Website Data</h3>
+        <p>The website uses <code>localStorage</code> to remember:</p>
+        <ul>
+            <li>Your age verification choice</li>
+            <li>Your selected language and theme</li>
+            <li>Your Discord OAuth access token (so you stay logged in)</li>
+        </ul>
+        <p>We do not use marketing cookies or third-party tracking pixels.</p>
+
+        <h2>2. How We Use the Data</h2>
+        <ul>
+            <li><strong>Operate the service:</strong> generate AI responses, enforce per-plan quotas, manage subscriptions and credits</li>
+            <li><strong>Personalization:</strong> inject your profile and saved memories into the AI prompt for continuity</li>
+            <li><strong>Anti-fraud:</strong> detect referral abuse, multi-accounting, automated abuse</li>
+            <li><strong>Support and communication:</strong> reply to your questions, send transactional Discord DMs (purchase confirmations, streak rewards)</li>
+        </ul>
+        <p>We do <strong>not</strong> sell your data and we do <strong>not</strong> use your conversation content to train AI models.</p>
+
+        <h2>3. Third-Party Processors</h2>
+        <p>To deliver the service we share necessary data with:</p>
+        <ul>
+            <li><strong>Discord</strong> — for authentication, bot operation, and DM delivery</li>
+            <li><strong>Stripe</strong> — for payment processing</li>
+            <li><strong>Groq / OpenRouter / similar AI providers</strong> — your messages are sent to a large language model for response generation. The provider's own privacy policy applies to that processing.</li>
+            <li><strong>Render</strong> — server hosting (bot + API + database)</li>
+            <li><strong>Vercel</strong> — website hosting</li>
+        </ul>
+
+        <h2>4. Data Retention</h2>
+        <ul>
+            <li><strong>Active sessions:</strong> deleted when the session ends.</li>
+            <li><strong>Memories:</strong> kept indefinitely until you wipe them via <code>/memories</code>.</li>
+            <li><strong>Profile + credits + usage counters:</strong> kept while the account is active.</li>
+            <li><strong>Payment records:</strong> retained per legal/accounting requirements (typically <span class="placeholder">&lt;6 to 10 years&gt;</span>).</li>
+            <li><strong>Account deletion:</strong> on request, we delete your profile, custom characters, and memories. Payment records are kept anonymized for accounting.</li>
+        </ul>
+
+        <h2>5. Your Rights</h2>
+        <p>Depending on your jurisdiction (especially EU/UK GDPR, California CCPA), you have the right to:</p>
+        <ul>
+            <li><strong>Access</strong> the personal data we hold about you</li>
+            <li><strong>Correct</strong> inaccurate data (profile fields can be edited via <code>/profile</code>)</li>
+            <li><strong>Delete</strong> your data ("right to be forgotten")</li>
+            <li><strong>Port</strong> your data to another service</li>
+            <li><strong>Object</strong> to certain processing</li>
+            <li><strong>Withdraw consent</strong> where processing is based on consent</li>
+        </ul>
+        <p>You can wipe your saved memories at any time using <code>/memories</code> in Discord. For all other requests, contact
+        <span class="placeholder">&lt;SUPPORT EMAIL&gt;</span>.</p>
+
+        <h2>6. Security</h2>
+        <p>We use industry-standard practices: encrypted connections (HTTPS), secrets stored as environment variables, database
+        access restricted to the application. No system is 100% secure. In the event of a breach affecting your data, we will
+        notify you in accordance with applicable law.</p>
+
+        <h2>7. International Data Transfers</h2>
+        <p>Our infrastructure providers (Render, Vercel, Stripe, Discord, AI providers) may host data in the United States or
+        other countries. By using the service, you consent to your data being processed in those locations, subject to
+        appropriate safeguards required by your local law (e.g. Standard Contractual Clauses for EU-US transfers).</p>
+
+        <h2>8. Children</h2>
+        <p>The service is strictly for adults (18+). We do not knowingly collect data from minors. If we learn we have
+        collected data from a minor, we will delete it promptly.</p>
+
+        <h2>9. Changes</h2>
+        <p>We may update this policy. The "Last updated" date at the top reflects the latest version. Material changes will be
+        announced on this page.</p>
+
+        <h2>10. Contact</h2>
+        <p>For privacy-related questions or to exercise your rights, contact us at
+        <span class="placeholder">&lt;SUPPORT EMAIL&gt;</span>.</p>
+        <p>If you are in the EU and we do not resolve your concern, you may lodge a complaint with your local Data Protection
+        Authority.</p>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>KlaraAI</h4>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">Private ERP Discord bot for adults.</p>
+                <p class="footer-warning">⚠️ Site and bot reserved for 18+ only</p>
+            </div>
+            <div class="footer-section">
+                <h4>Links</h4>
+                <a href="index.html">Home</a>
+                <a href="pricing.html">Pricing</a>
+                <a href="buy-credits.html">Buy Credits</a>
+            </div>
+            <div class="footer-section">
+                <h4>Legal</h4>
+                <a href="terms.html">Terms of Service</a>
+                <a href="privacy.html">Privacy Policy</a>
+                <a href="legal.html">Legal Notice</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>© 2026 KlaraAI. All rights reserved. Site reserved for adults (18+).</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
