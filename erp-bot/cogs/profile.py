@@ -45,7 +45,7 @@ class ProfileCog(commands.Cog):
                 except Exception as e:
                     print(f"[Profile] Credits fetch failed: {e}")
 
-                embed = self._build_profile_embed(interaction.user, profile, credits=credits)
+                embed = await self._build_profile_embed_async(interaction.user, profile, credits=credits)
 
                 view = discord.ui.View(timeout=300)
 
@@ -116,12 +116,18 @@ class ProfileCog(commands.Cog):
             except Exception as e:
                 print(f"[Profile] Credits fetch failed: {e}")
 
+            try:
+                streak_info = await asyncio.wait_for(
+                    PostgresDB.get_streak(interaction.user.id), timeout=5.0
+                )
+            except Exception:
+                streak_info = None
             embed = discord.Embed(
                 title="✅ Profile Updated",
                 description="Your profile has been saved.",
                 color=discord.Color.from_rgb(46, 204, 113)
             )
-            embed = self._build_profile_embed(interaction.user, profile, credits=credits, embed=embed)
+            embed = self._build_profile_embed(interaction.user, profile, credits=credits, embed=embed, streak_info=streak_info)
             await interaction.followup.send(embed=embed)
 
         except Exception as e:
@@ -140,7 +146,18 @@ class ProfileCog(commands.Cog):
         modal = ProfileEditModal(self)
         await interaction.response.send_modal(modal)
 
-    def _build_profile_embed(self, user: discord.User, profile: dict, credits: int = None, embed: discord.Embed = None) -> discord.Embed:
+    async def _build_profile_embed_async(self, user: discord.User, profile: dict, credits: int = None) -> discord.Embed:
+        """Async wrapper that also pulls streak info before building the embed."""
+        try:
+            streak_info = await asyncio.wait_for(
+                PostgresDB.get_streak(user.id), timeout=5.0
+            )
+        except Exception as e:
+            print(f"[Profile] Streak fetch failed: {e}")
+            streak_info = {"streak": 0, "max": 0, "active": False}
+        return self._build_profile_embed(user, profile, credits=credits, streak_info=streak_info)
+
+    def _build_profile_embed(self, user: discord.User, profile: dict, credits: int = None, embed: discord.Embed = None, streak_info: dict = None) -> discord.Embed:
         sub_type = profile.get("sub_type", "free")
         sub_info = config.SUBSCRIPTIONS.get(sub_type, config.SUBSCRIPTIONS["free"])
         sub_name = sub_info["name"]
@@ -188,6 +205,27 @@ class ProfileCog(commands.Cog):
         quota_value = self._build_quota_value(profile, sub_info)
         if quota_value:
             embed.add_field(name="⏳ Daily Quota", value=quota_value, inline=False)
+
+        # Streak display (live + best ever)
+        if streak_info is not None:
+            streak = streak_info.get("streak", 0)
+            best = streak_info.get("max", 0)
+            active = streak_info.get("active", False)
+            if streak >= 1:
+                fire = "🔥" * min(streak // 7 + 1, 5) if active else "💤"
+                streak_text = (
+                    f"{fire} Current: **{streak} day{'s' if streak != 1 else ''}**"
+                    + (f"  ·  Best: **{best}**" if best > streak else "")
+                )
+                if active and streak < 30:
+                    next_milestones = [3, 7, 14, 30]
+                    next_target = next((n for n in next_milestones if n > streak), None)
+                    if next_target:
+                        rewards = {3: 3, 7: 10, 14: 20, 30: 50}
+                        streak_text += f"\n*Next reward: +{rewards[next_target]} credits at day {next_target}*"
+                elif active and streak >= 30:
+                    streak_text += "\n*+15 credits every 7 days from here on*"
+                embed.add_field(name="🔥 Streak", value=streak_text, inline=False)
 
         desc = profile.get("description")
         embed.add_field(
@@ -451,12 +489,18 @@ class ProfileEditModal(discord.ui.Modal):
             except Exception as e:
                 print(f"[ProfileEditModal] Credits fetch failed: {e}")
 
+            try:
+                streak_info = await asyncio.wait_for(
+                    PostgresDB.get_streak(interaction.user.id), timeout=5.0
+                )
+            except Exception:
+                streak_info = None
             embed = discord.Embed(
                 title="✅ Profile Updated",
                 description="Your profile has been saved.",
                 color=discord.Color.from_rgb(46, 204, 113)
             )
-            embed = self.cog._build_profile_embed(interaction.user, profile, credits=credits, embed=embed)
+            embed = self.cog._build_profile_embed(interaction.user, profile, credits=credits, embed=embed, streak_info=streak_info)
             await interaction.followup.send(embed=embed)
 
         except Exception as e:

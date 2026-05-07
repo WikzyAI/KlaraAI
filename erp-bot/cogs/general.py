@@ -22,9 +22,11 @@ class GeneralCog(commands.Cog):
             name="🎭 Main Commands",
             value=(
                 "`/erp` — Open the session menu\n"
-                "`/profile` — View / edit your profile & credits\n"
+                "`/profile` — Profile, credits & streak\n"
                 "`/settings` — Tune response length & customs\n"
                 "`/premium` — Subscriptions & wallet\n"
+                "`/memories` — What your characters remember about you\n"
+                "`/referral` — Invite friends, earn credits\n"
                 "`/help` — This message\n"
                 "`/ping` — Check bot latency"
             ),

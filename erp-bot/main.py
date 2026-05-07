@@ -36,6 +36,7 @@ class ERPBot(commands.Bot):
         await self.add_cog(PremiumCog(self))
         await self.add_cog(ERPCog(self))
         await self.add_cog(Characters(self))
+        await self.add_cog(SocialCog(self))
         print("[OK] Cogs loaded")
 
         self.tree.interaction_check = self._global_interaction_check
@@ -122,6 +123,7 @@ from cogs.profile import ProfileCog
 from cogs.premium import PremiumCog
 from cogs.erp import ERPCog
 from cogs.characters import Characters
+from cogs.social import SocialCog
 
 
 if __name__ == "__main__":

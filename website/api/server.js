@@ -309,6 +309,62 @@ app.get('/api/leaderboard', (req, res) => {
 });
 
 // ============================================
+// Referral system (signup -> first-purchase reward)
+// ============================================
+const REFERRER_PURCHASE_BONUS = 200;        // credits given to the referrer
+const REFERRER_PURCHASE_THRESHOLD = 500;    // referee must spend >= this many credits ($5)
+
+// Bot calls this when a user applies a referral code, so the webhook can later
+// detect the converting purchase without needing Postgres access.
+app.post('/api/referrals/set', (req, res) => {
+    if (!req.body.secret || req.body.secret !== process.env.API_SECRET) {
+        return res.status(401).json({ error: 'Invalid secret' });
+    }
+    const { referred_id, referrer_id } = req.body;
+    if (!referred_id || !referrer_id || String(referred_id) === String(referrer_id)) {
+        return res.status(400).json({ error: 'Invalid ids' });
+    }
+    const data = readJSONDB();
+    if (!data.users[referred_id]) {
+        data.users[referred_id] = {
+            credits: 0, history: [], created_at: new Date().toISOString()
+        };
+    }
+    if (data.users[referred_id].referrer_id) {
+        return res.json({ success: false, error: 'Already has a referrer' });
+    }
+    data.users[referred_id].referrer_id = String(referrer_id);
+    data.users[referred_id].referrer_granted = false;
+    data.users[referred_id].total_purchased = data.users[referred_id].total_purchased || 0;
+    writeJSONDB(data);
+    console.log(`[Referral] ${referred_id} linked to referrer ${referrer_id}`);
+    res.json({ success: true });
+});
+
+function maybeGrantReferralReward(data, referredId, packName) {
+    const user = data.users[referredId];
+    if (!user || !user.referrer_id || user.referrer_granted) return null;
+    if ((user.total_purchased || 0) < REFERRER_PURCHASE_THRESHOLD) return null;
+
+    const referrerId = user.referrer_id;
+    if (!data.users[referrerId]) {
+        data.users[referrerId] = {
+            credits: 0, history: [], created_at: new Date().toISOString()
+        };
+    }
+    data.users[referrerId].credits += REFERRER_PURCHASE_BONUS;
+    data.users[referrerId].history = data.users[referrerId].history || [];
+    data.users[referrerId].history.push({
+        type: 'add',
+        amount: REFERRER_PURCHASE_BONUS,
+        pack_name: `Referral bonus (${referredId} bought ${packName})`,
+        timestamp: new Date().toISOString()
+    });
+    user.referrer_granted = true;
+    return { referrerId, amount: REFERRER_PURCHASE_BONUS };
+}
+
+// ============================================
 // Stripe Payment Routes
 // ============================================
 
@@ -416,6 +472,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
         data.users[discordId].credits += credits;
         data.users[discordId].username = username;
+        data.users[discordId].total_purchased = (data.users[discordId].total_purchased || 0) + credits;
         data.users[discordId].history = data.users[discordId].history || [];
         data.users[discordId].history.push({
             type: 'add',
@@ -427,6 +484,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         });
         data.users[discordId].updated_at = new Date().toISOString();
 
+        // If this user was referred and just hit the spending threshold, reward the referrer.
+        const referralPayout = maybeGrantReferralReward(data, discordId, packName);
+
         writeJSONDB(data);
 
         console.log(`[Stripe] Added ${credits} credits to ${discordId} (${username}) - Session: ${session.id}`);
@@ -434,6 +494,12 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         // Send DM notification
         const thankYouMsg = `Thank you for your purchase! You have added **${credits} credits** (${packName} Pack). Your new balance is **${data.users[discordId].credits} credits**. Enjoy!`;
         sendDM(discordId, thankYouMsg);
+
+        if (referralPayout) {
+            console.log(`[Referral] Granted ${referralPayout.amount} credits to referrer ${referralPayout.referrerId} (referee ${discordId} converted)`);
+            const refMsg = `🎁 **Referral reward!** A friend you invited just made their first purchase. You earned **+${referralPayout.amount} credits**. Enjoy!`;
+            sendDM(referralPayout.referrerId, refMsg);
+        }
     }
 
     res.json({ received: true });

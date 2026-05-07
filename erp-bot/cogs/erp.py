@@ -7,10 +7,13 @@ from discord import app_commands
 from discord.ext import commands
 import json
 import os
+import asyncio
 from config import DEFAULT_CHARACTERS, SYSTEM_PROMPT
 from utils.db import PostgresDB
 from utils.groq_client import GroqClient
 from utils.ai_queue import AIQueue
+from utils.api_client import add_credits
+from utils.memory_extractor import extract_memories, format_memories_for_prompt
 
 
 class ERPCog(commands.Cog):
@@ -23,13 +26,18 @@ class ERPCog(commands.Cog):
     async def cog_load(self):
         await self.ai_queue.start()
 
-    def _build_messages(self, character: dict, history: list, user_profile: dict, context_limit: int) -> list:
+    def _build_messages(self, character: dict, history: list, user_profile: dict,
+                        context_limit: int, memories: list = None) -> list:
         char_desc = character["desc"]
         if user_profile:
             user_name = user_profile.get("name") or "the user"
             user_age = user_profile.get("age") or "unspecified"
             user_desc = user_profile.get("description") or "unspecified"
             char_desc += f"\n\nThe user's name is {user_name}, age {user_age}. Description: {user_desc}"
+
+        # Inject persistent long-term memories from previous sessions.
+        if memories:
+            char_desc += format_memories_for_prompt(memories, character["name"])
 
         system_content = SYSTEM_PROMPT.format(
             character_name=character["name"],
@@ -104,8 +112,16 @@ class ERPCog(commands.Cog):
         print(f"[DEBUG ERP] User message added to history")
 
         user_profile = await PostgresDB.get_profile(user_id)
-        messages = self._build_messages(character, session["messages"], user_profile, context_limit)
-        print(f"[DEBUG ERP] Messages prepared for AI ({len(messages)} messages, context={context_limit}, tokens={max_tokens})")
+
+        # Pull up to 12 long-term memories for this user/character pair.
+        try:
+            memories = await PostgresDB.get_memories(user_id, char_key, limit=12)
+        except Exception as e:
+            print(f"[DEBUG ERP] Memory load failed: {e}")
+            memories = []
+
+        messages = self._build_messages(character, session["messages"], user_profile, context_limit, memories=memories)
+        print(f"[DEBUG ERP] Messages prepared ({len(messages)} msgs, ctx={context_limit}, tokens={max_tokens}, memories={len(memories)})")
 
         sub_type = limits["type"]
         async with message.channel.typing():
@@ -129,8 +145,38 @@ class ERPCog(commands.Cog):
         # Send as plain text (not embed) - split if too long
         await self._send_split_message(message.channel, ai_response)
 
+        # Streak: bump and reward on milestones (background, never blocks the reply)
+        asyncio.create_task(self._handle_streak(message, user_id, user_profile))
+
         print(f"[DEBUG ERP] Response sent successfully")
         return True
+
+    async def _handle_streak(self, message: discord.Message, user_id: int, user_profile: dict):
+        try:
+            res = await PostgresDB.update_streak(user_id)
+            reward = res.get("milestone_reward", 0)
+            streak = res.get("streak", 0)
+            if reward > 0:
+                username = user_profile.get("name") or message.author.name
+                granted = await asyncio.to_thread(
+                    add_credits, str(user_id), reward, username, f"Streak day {streak}"
+                )
+                if granted.get("success", False):
+                    embed = discord.Embed(
+                        title=f"🔥 {streak}-day streak!",
+                        description=(
+                            f"You just earned **+{reward} credits** for keeping the streak alive.\n"
+                            f"*Come back tomorrow to keep it going.*"
+                        ),
+                        color=discord.Color.from_rgb(255, 165, 0)
+                    )
+                    embed.set_footer(text=f"New balance reflected in /profile")
+                    try:
+                        await message.channel.send(embed=embed)
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[Streak] handle_streak failed: {e}")
 
     async def _send_split_message(self, channel, text):
         """Send message, split if it exceeds Discord's 2000 char limit at sentence boundaries."""
@@ -398,15 +444,37 @@ class ERPCog(commands.Cog):
 
         session = await PostgresDB.get_session(interaction.user.id)
         char_name = session.get("character_name", "Unknown")
+        char_key = session.get("character")
+        msgs = session.get("messages", []) or []
 
         await PostgresDB.delete_session(interaction.user.id)
 
         embed = discord.Embed(
             title="🌙 Scene Ended",
-            description=f"*The lights dim and **{char_name}** fades away...*\n\nThanks for the moment. Use `/erp` whenever you want to come back.",
+            description=(
+                f"*The lights dim and **{char_name}** fades away...*\n\n"
+                f"💭 Saving memories so she remembers next time..."
+            ),
             color=discord.Color.from_rgb(147, 112, 219)
         )
         await interaction.followup.send(embed=embed)
+
+        # Extract & persist memories in the background (does not block the user)
+        if char_key and len(msgs) >= 4:
+            asyncio.create_task(
+                self._save_session_memories(interaction.user.id, char_key, char_name, msgs)
+            )
+
+    async def _save_session_memories(self, user_id: int, char_key: str,
+                                     char_name: str, messages: list):
+        try:
+            items = await extract_memories(self.groq, char_name, messages)
+            if not items:
+                return
+            await PostgresDB.add_memories_bulk(user_id, char_key, items)
+            print(f"[Memory] Saved {len(items)} memories for user {user_id} / {char_key}")
+        except Exception as e:
+            print(f"[Memory] Failed to save session memories: {e}")
 
     async def _erp_list(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)

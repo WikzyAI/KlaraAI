@@ -87,6 +87,52 @@ class PostgresDB:
                 )
             """)
 
+            # Long-term memories table (per user/character pair)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS memories (
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    character_key TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    importance INT DEFAULT 5,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_memories_lookup
+                ON memories (user_id, character_key, importance DESC, created_at DESC)
+            """)
+
+            # Referral rewards log (one row per referral relationship)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS referrals (
+                    referred_id BIGINT PRIMARY KEY,
+                    referrer_id BIGINT NOT NULL,
+                    code_used TEXT NOT NULL,
+                    signup_bonus_granted BOOL DEFAULT FALSE,
+                    purchase_bonus_granted BOOL DEFAULT FALSE,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_referrals_referrer
+                ON referrals (referrer_id)
+            """)
+
+            # Streak / referral / engagement columns on profiles (idempotent)
+            await conn.execute("""
+                ALTER TABLE profiles
+                    ADD COLUMN IF NOT EXISTS streak_count INT DEFAULT 0,
+                    ADD COLUMN IF NOT EXISTS streak_max INT DEFAULT 0,
+                    ADD COLUMN IF NOT EXISTS streak_last_day DATE,
+                    ADD COLUMN IF NOT EXISTS referral_code TEXT,
+                    ADD COLUMN IF NOT EXISTS total_purchased_credits INT DEFAULT 0
+            """)
+            await conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_referral_code
+                ON profiles (referral_code) WHERE referral_code IS NOT NULL
+            """)
+
         # Insert default characters if not present
         await cls._insert_default_characters()
 
@@ -402,3 +448,304 @@ class PostgresDB:
             if creator is None:
                 return True
             return str(creator) == str(user_id)
+
+    # ---- Memory methods ----
+
+    @classmethod
+    async def add_memory(cls, user_id, character_key: str, content: str, importance: int = 5):
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO memories (user_id, character_key, content, importance) "
+                "VALUES ($1, $2, $3, $4)",
+                user_id, character_key, content[:1000], max(1, min(10, importance))
+            )
+
+    @classmethod
+    async def add_memories_bulk(cls, user_id, character_key: str, items: list):
+        """items = [{'content': str, 'importance': int}, ...]"""
+        user_id = int(user_id)
+        if not items:
+            return
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            await conn.executemany(
+                "INSERT INTO memories (user_id, character_key, content, importance) "
+                "VALUES ($1, $2, $3, $4)",
+                [(user_id, character_key, m["content"][:1000],
+                  max(1, min(10, int(m.get("importance", 5))))) for m in items]
+            )
+
+    @classmethod
+    async def get_memories(cls, user_id, character_key: str, limit: int = 12) -> list:
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT id, content, importance, created_at FROM memories "
+                "WHERE user_id = $1 AND character_key = $2 "
+                "ORDER BY importance DESC, created_at DESC LIMIT $3",
+                user_id, character_key, limit
+            )
+            return [dict(r) for r in rows]
+
+    @classmethod
+    async def get_all_memories_grouped(cls, user_id) -> dict:
+        """All memories for a user, grouped by character_key."""
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT id, character_key, content, importance, created_at FROM memories "
+                "WHERE user_id = $1 ORDER BY character_key, importance DESC, created_at DESC",
+                user_id
+            )
+        grouped = {}
+        for r in rows:
+            grouped.setdefault(r["character_key"], []).append(dict(r))
+        return grouped
+
+    @classmethod
+    async def delete_memory(cls, memory_id: int, user_id) -> bool:
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            res = await conn.execute(
+                "DELETE FROM memories WHERE id = $1 AND user_id = $2",
+                memory_id, user_id
+            )
+            return res.endswith(" 1")
+
+    @classmethod
+    async def clear_memories(cls, user_id, character_key: str = None) -> int:
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            if character_key is None:
+                res = await conn.execute(
+                    "DELETE FROM memories WHERE user_id = $1", user_id
+                )
+            else:
+                res = await conn.execute(
+                    "DELETE FROM memories WHERE user_id = $1 AND character_key = $2",
+                    user_id, character_key
+                )
+            try:
+                return int(res.split()[-1])
+            except Exception:
+                return 0
+
+    # ---- Streak methods ----
+
+    @classmethod
+    async def update_streak(cls, user_id) -> dict:
+        """
+        Bump the streak based on UTC calendar day.
+        Returns {'streak': int, 'milestone_reward': int (credits, 0 if none)}.
+        Milestones: day 3 (+3), 7 (+10), 14 (+20), 30 (+50), then every 7 days (+15).
+        """
+        from datetime import date, timedelta as _td
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        today = date.today()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT streak_count, streak_max, streak_last_day FROM profiles WHERE user_id = $1",
+                user_id
+            )
+            if row is None:
+                return {"streak": 0, "milestone_reward": 0}
+
+            current = row["streak_count"] or 0
+            max_streak = row["streak_max"] or 0
+            last_day = row["streak_last_day"]
+
+            if last_day == today:
+                return {"streak": current, "milestone_reward": 0}
+
+            if last_day == today - _td(days=1):
+                current += 1
+            else:
+                current = 1
+
+            if current > max_streak:
+                max_streak = current
+
+            await conn.execute(
+                "UPDATE profiles SET streak_count = $1, streak_max = $2, streak_last_day = $3 "
+                "WHERE user_id = $4",
+                current, max_streak, today, user_id
+            )
+
+        reward = 0
+        if current == 3:
+            reward = 3
+        elif current == 7:
+            reward = 10
+        elif current == 14:
+            reward = 20
+        elif current == 30:
+            reward = 50
+        elif current > 30 and (current - 30) % 7 == 0:
+            reward = 15
+
+        return {"streak": current, "milestone_reward": reward}
+
+    @classmethod
+    async def get_streak(cls, user_id) -> dict:
+        from datetime import date, timedelta as _td
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT streak_count, streak_max, streak_last_day FROM profiles WHERE user_id = $1",
+                user_id
+            )
+        if row is None:
+            return {"streak": 0, "max": 0, "active": False}
+        current = row["streak_count"] or 0
+        last_day = row["streak_last_day"]
+        today = date.today()
+        active = last_day in (today, today - _td(days=1))
+        if not active:
+            current = 0
+        return {"streak": current, "max": row["streak_max"] or 0, "active": active}
+
+    # ---- Referral methods ----
+
+    @classmethod
+    async def get_or_create_referral_code(cls, user_id) -> str:
+        import secrets
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            existing = await conn.fetchval(
+                "SELECT referral_code FROM profiles WHERE user_id = $1", user_id
+            )
+            if existing:
+                return existing
+            # Generate a unique 6-char code (no ambiguous chars)
+            alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+            for _ in range(20):
+                code = "".join(secrets.choice(alphabet) for _ in range(6))
+                try:
+                    await conn.execute(
+                        "UPDATE profiles SET referral_code = $1 WHERE user_id = $2",
+                        code, user_id
+                    )
+                    return code
+                except asyncpg.UniqueViolationError:
+                    continue
+            raise RuntimeError("Could not generate a unique referral code")
+
+    @classmethod
+    async def get_referrer_by_code(cls, code: str):
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            return await conn.fetchval(
+                "SELECT user_id FROM profiles WHERE referral_code = $1", code
+            )
+
+    @classmethod
+    async def has_used_referral(cls, user_id) -> bool:
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT 1 FROM referrals WHERE referred_id = $1", user_id
+            )
+            return row is not None
+
+    @classmethod
+    async def record_referral(cls, referred_id, referrer_id, code: str) -> bool:
+        """Insert a referral row. Returns False if already exists or self-referral."""
+        referred_id = int(referred_id)
+        referrer_id = int(referrer_id)
+        if referred_id == referrer_id:
+            return False
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            try:
+                await conn.execute(
+                    "INSERT INTO referrals (referred_id, referrer_id, code_used) "
+                    "VALUES ($1, $2, $3)",
+                    referred_id, referrer_id, code
+                )
+                return True
+            except asyncpg.UniqueViolationError:
+                return False
+
+    @classmethod
+    async def mark_signup_bonus_granted(cls, referred_id):
+        referred_id = int(referred_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE referrals SET signup_bonus_granted = TRUE WHERE referred_id = $1",
+                referred_id
+            )
+
+    @classmethod
+    async def get_referral_for_purchase(cls, referred_id):
+        """
+        Return the referral row if this user was referred and the referrer has
+        not yet been rewarded for this user's first purchase. Else None.
+        """
+        referred_id = int(referred_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT referrer_id, code_used FROM referrals "
+                "WHERE referred_id = $1 AND purchase_bonus_granted = FALSE",
+                referred_id
+            )
+            return dict(row) if row else None
+
+    @classmethod
+    async def mark_purchase_bonus_granted(cls, referred_id):
+        referred_id = int(referred_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE referrals SET purchase_bonus_granted = TRUE WHERE referred_id = $1",
+                referred_id
+            )
+
+    @classmethod
+    async def get_referral_stats(cls, user_id) -> dict:
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            total = await conn.fetchval(
+                "SELECT COUNT(*) FROM referrals WHERE referrer_id = $1", user_id
+            )
+            converted = await conn.fetchval(
+                "SELECT COUNT(*) FROM referrals "
+                "WHERE referrer_id = $1 AND purchase_bonus_granted = TRUE",
+                user_id
+            )
+        return {"total": total or 0, "converted": converted or 0}
+
+    @classmethod
+    async def add_purchased_credits(cls, user_id, amount: int):
+        """Track lifetime purchases (used to detect 'first purchase' for referrals)."""
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO profiles (user_id, total_purchased_credits) VALUES ($1, $2) "
+                "ON CONFLICT (user_id) DO UPDATE SET "
+                "total_purchased_credits = COALESCE(profiles.total_purchased_credits, 0) + $2",
+                user_id, amount
+            )
+
+    @classmethod
+    async def get_total_purchased_credits(cls, user_id) -> int:
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            v = await conn.fetchval(
+                "SELECT total_purchased_credits FROM profiles WHERE user_id = $1", user_id
+            )
+            return v or 0
