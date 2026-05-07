@@ -55,6 +55,16 @@ class PremiumCog(commands.Cog):
             inline=True
         )
 
+        # Show exact reset countdown when at least one quota is limited.
+        if limits["daily_msgs"] != -1 or limits["daily_sessions"] != -1:
+            reset_at = PostgresDB.get_reset_at(profile)
+            if reset_at is None:
+                reset_text = "🔄 Window not started — full quota available."
+            else:
+                ts = int(reset_at.timestamp())
+                reset_text = f"🔄 Quota resets <t:{ts}:R> *(at <t:{ts}:t>)*"
+            embed.add_field(name="⏳ Reset", value=reset_text, inline=False)
+
         plan_titles = {
             "free": "🌿 Free Trial",
             "standard": "💎 Standard",

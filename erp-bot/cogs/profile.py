@@ -64,7 +64,7 @@ class ProfileCog(commands.Cog):
                     emoji="⚙️",
                     row=0
                 )
-                settings_btn.callback = lambda i: self.settings(i)
+                settings_btn.callback = self._render_settings
                 view.add_item(settings_btn)
 
                 if profile.get("sub_type", "free") != "free":
@@ -153,7 +153,6 @@ class ProfileCog(commands.Cog):
                 color=accent
             )
 
-        # Avatar as thumbnail for a polished look
         try:
             avatar_url = user.display_avatar.url
             embed.set_thumbnail(url=avatar_url)
@@ -171,7 +170,6 @@ class ProfileCog(commands.Cog):
         embed.add_field(name="🎂 Age", value=str(profile.get("age")) if profile.get("age") else "*Not set*", inline=True)
         embed.add_field(name=f"{sub_emoji} Plan", value=f"**{sub_name}**", inline=True)
 
-        # Always show credits (defaults to 0 if API fails)
         credits_value = credits if credits is not None else 0
         embed.add_field(
             name="💰 Credits",
@@ -185,6 +183,12 @@ class ProfileCog(commands.Cog):
         )
         embed.add_field(name="​", value="​", inline=True)  # spacer
 
+        # Daily quota with exact reset countdown (skipped only when both
+        # messages AND sessions are unlimited, e.g. Premium).
+        quota_value = self._build_quota_value(profile, sub_info)
+        if quota_value:
+            embed.add_field(name="⏳ Daily Quota", value=quota_value, inline=False)
+
         desc = profile.get("description")
         embed.add_field(
             name="📝 Description",
@@ -195,10 +199,42 @@ class ProfileCog(commands.Cog):
         embed.set_footer(text="Edit your profile or buy credits below ↓")
         return embed
 
+    @staticmethod
+    def _build_quota_value(profile: dict, sub_info: dict) -> str:
+        msg_limit = sub_info["daily_msgs"]
+        sess_limit = sub_info["daily_sessions"]
+        if msg_limit == -1 and sess_limit == -1:
+            return ""
+
+        msgs_used = profile.get("daily_msgs_used", 0)
+        sess_used = profile.get("daily_sessions_used", 0)
+
+        msgs_line = (
+            f"💬 Messages: `{msgs_used}/∞`" if msg_limit == -1
+            else f"💬 Messages: `{msgs_used}/{msg_limit}`"
+        )
+        sess_line = (
+            f"🎬 Sessions: `{sess_used}/∞`" if sess_limit == -1
+            else f"🎬 Sessions: `{sess_used}/{sess_limit}`"
+        )
+
+        reset_at = PostgresDB.get_reset_at(profile)
+        if reset_at is None:
+            reset_line = "🔄 Window not started yet — full quota available."
+        else:
+            ts = int(reset_at.timestamp())
+            reset_line = f"🔄 Resets <t:{ts}:R> *(at <t:{ts}:t>)*"
+
+        return f"{msgs_line}\n{sess_line}\n{reset_line}"
+
     @app_commands.command(name="settings", description="Configure bot settings (response length, custom characters)")
     async def settings(self, interaction: discord.Interaction):
+        await self._render_settings(interaction)
+
+    async def _render_settings(self, interaction: discord.Interaction):
         try:
-            await interaction.response.defer(thinking=True)
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True)
 
             user_id = interaction.user.id
             profile = await asyncio.wait_for(

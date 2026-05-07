@@ -5,8 +5,14 @@ Replaces the old JSON-based database for concurrent-safe operations.
 import asyncpg
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import config
+
+
+# Daily quotas reset on a 24h rolling window: when a user starts using their
+# quota (first message of the window) `last_reset` is set to NOW; once 24h
+# elapse, the counters reset and the next message starts a fresh window.
+RESET_WINDOW = timedelta(hours=24)
 
 
 class PostgresDB:
@@ -23,7 +29,7 @@ class PostgresDB:
         cls._pool = await asyncpg.create_pool(url, min_size=2, max_size=20)
 
         async with cls._pool.acquire() as conn:
-            # Profiles table
+            # Profiles table — last_reset is a TIMESTAMPTZ (24h rolling window).
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS profiles (
                     user_id BIGINT PRIMARY KEY,
@@ -34,9 +40,27 @@ class PostgresDB:
                     credits INT DEFAULT 0,
                     daily_msgs_used INT DEFAULT 0,
                     daily_sessions_used INT DEFAULT 0,
-                    last_reset DATE DEFAULT CURRENT_DATE,
+                    last_reset TIMESTAMPTZ,
                     response_length TEXT DEFAULT 'medium'
                 )
+            """)
+
+            # Idempotent migration: legacy column was DATE; convert to TIMESTAMPTZ.
+            await conn.execute("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'profiles'
+                          AND column_name = 'last_reset'
+                          AND data_type = 'date'
+                    ) THEN
+                        ALTER TABLE profiles
+                            ALTER COLUMN last_reset DROP DEFAULT,
+                            ALTER COLUMN last_reset TYPE TIMESTAMPTZ
+                                USING last_reset::timestamptz;
+                    END IF;
+                END $$;
             """)
 
             # Sessions table
@@ -121,21 +145,41 @@ class PostgresDB:
 
     @classmethod
     async def _check_reset_daily(cls, profile: dict) -> dict:
-        from datetime import date
-        today = date.today()
+        """
+        24h rolling window: if the window opened more than 24h ago, reset the
+        counters and clear the window (a new window starts on the next message).
+        """
         last_reset = profile.get("last_reset")
-        if last_reset != today:
+        if last_reset is None:
+            return profile
+        # asyncpg returns timezone-aware datetimes for TIMESTAMPTZ
+        if last_reset.tzinfo is None:
+            last_reset = last_reset.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - last_reset >= RESET_WINDOW:
             pool = cls._pool_get()
             async with pool.acquire() as conn:
                 await conn.execute(
-                    "UPDATE profiles SET daily_msgs_used = 0, daily_sessions_used = 0, last_reset = $1 "
-                    "WHERE user_id = $2",
-                    today, profile["user_id"]
+                    "UPDATE profiles SET daily_msgs_used = 0, daily_sessions_used = 0, "
+                    "last_reset = NULL WHERE user_id = $1",
+                    profile["user_id"]
                 )
             profile["daily_msgs_used"] = 0
             profile["daily_sessions_used"] = 0
-            profile["last_reset"] = today
+            profile["last_reset"] = None
         return profile
+
+    @classmethod
+    def get_reset_at(cls, profile: dict):
+        """
+        Return the UTC datetime at which the user's daily quota will reset,
+        or None if the user has not started a window yet (full quota available).
+        """
+        last_reset = profile.get("last_reset")
+        if last_reset is None:
+            return None
+        if last_reset.tzinfo is None:
+            last_reset = last_reset.replace(tzinfo=timezone.utc)
+        return last_reset + RESET_WINDOW
 
     @classmethod
     async def update_profile(cls, user_id, **kwargs) -> dict:
@@ -145,18 +189,19 @@ class PostgresDB:
 
         for k, v in kwargs.items():
             if k in ("name", "age", "description", "sub_type", "credits",
-                     "daily_msgs_used", "daily_sessions_used", "response_length"):
+                     "daily_msgs_used", "daily_sessions_used", "response_length",
+                     "last_reset"):
                 profile[k] = v
 
         async with pool.acquire() as conn:
             await conn.execute(
                 "UPDATE profiles SET name = $1, age = $2, description = $3, sub_type = $4, "
                 "credits = $5, daily_msgs_used = $6, daily_sessions_used = $7, "
-                "response_length = $8 WHERE user_id = $9",
+                "response_length = $8, last_reset = $9 WHERE user_id = $10",
                 profile.get("name"), profile.get("age"), profile.get("description"),
                 profile.get("sub_type"), profile.get("credits"),
                 profile.get("daily_msgs_used"), profile.get("daily_sessions_used"),
-                profile.get("response_length"), user_id
+                profile.get("response_length"), profile.get("last_reset"), user_id
             )
         return profile
 
@@ -191,8 +236,12 @@ class PostgresDB:
         user_id = int(user_id)
         pool = cls._pool_get()
         async with pool.acquire() as conn:
+            # Open a fresh 24h window the moment the counter starts climbing.
             await conn.execute(
-                "UPDATE profiles SET daily_msgs_used = daily_msgs_used + 1 WHERE user_id = $1",
+                "UPDATE profiles SET "
+                "daily_msgs_used = daily_msgs_used + 1, "
+                "last_reset = COALESCE(last_reset, NOW()) "
+                "WHERE user_id = $1",
                 user_id
             )
 
@@ -212,7 +261,10 @@ class PostgresDB:
         pool = cls._pool_get()
         async with pool.acquire() as conn:
             await conn.execute(
-                "UPDATE profiles SET daily_sessions_used = daily_sessions_used + 1 WHERE user_id = $1",
+                "UPDATE profiles SET "
+                "daily_sessions_used = daily_sessions_used + 1, "
+                "last_reset = COALESCE(last_reset, NOW()) "
+                "WHERE user_id = $1",
                 user_id
             )
 
