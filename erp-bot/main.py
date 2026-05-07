@@ -41,6 +41,7 @@ class ERPBot(commands.Bot):
         intents.dm_messages = True
         super().__init__(command_prefix="!", intents=intents)
         self._presence_iter = itertools.cycle(PRESENCE_ROTATION)
+        self._keep_alive_runner = None
 
     async def setup_hook(self):
         # Initialize PostgreSQL
@@ -54,6 +55,16 @@ class ERPBot(commands.Bot):
             print(f"[ERROR] PostgreSQL init failed: {e}")
             traceback.print_exc()
             return
+
+        # Start the keep-alive HTTP server when running on a host that
+        # provides a $PORT env var (Render, Replit, Fly, Railway, ...).
+        # Locally we don't need it.
+        if os.getenv("PORT") or os.getenv("KEEP_ALIVE") == "1":
+            try:
+                from utils.keep_alive import start_keep_alive
+                self._keep_alive_runner = await start_keep_alive()
+            except Exception as e:
+                print(f"[KeepAlive] start failed: {e}")
 
         await self.add_cog(GeneralCog(self))
         await self.add_cog(ProfileCog(self))
@@ -77,6 +88,12 @@ class ERPBot(commands.Bot):
         """Clean up resources on shutdown."""
         if self.rotate_presence.is_running():
             self.rotate_presence.cancel()
+        if self._keep_alive_runner is not None:
+            try:
+                await self._keep_alive_runner.cleanup()
+                print("[OK] Keep-alive server stopped")
+            except Exception:
+                pass
         await PostgresDB.close_db()
         print("[OK] Database pool closed")
 

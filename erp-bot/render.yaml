@@ -1,0 +1,34 @@
+# Render deployment blueprint for the KlaraAI Discord bot.
+# Drop this file into the bot's root and Render's "Blueprint" feature
+# will create the service automatically when you connect the repo.
+#
+# https://render.com/docs/infrastructure-as-code
+services:
+  - type: web
+    name: klaraai-bot
+    runtime: python
+    plan: free
+    rootDir: erp-bot
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    autoDeploy: true
+    healthCheckPath: /ping
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12
+      # The following must be set manually in the Render dashboard
+      # (Environment tab) — do NOT commit secrets here.
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: API_BASE
+        sync: false
+      - key: API_SECRET
+        sync: false
+      - key: LLM_PRIMARY
+        value: groq
