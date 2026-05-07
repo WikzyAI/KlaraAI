@@ -20,11 +20,11 @@
             </ul>
         </div>
         <div class="nav-right">
-            <select id="lang-selector" onchange="changeLanguage(this.value)" class="lang-selector">
-                <option value="fr">🇫🇷 Français</option>
-                <option value="en">🇺🇸 English</option>
-                <option value="es">🇪🇸 Español</option>
-                <option value="it">🇮🇹 Italiano</option>
+            <select id="lang-selector" onchange="changeLanguage(this.value)" class="lang-selector" aria-label="Language">
+                <option value="fr">FR · Français</option>
+                <option value="en">EN · English</option>
+                <option value="es">ES · Español</option>
+                <option value="it">IT · Italiano</option>
             </select>
             <button class="theme-toggle" onclick="toggleTheme()" title="Changer de thème" id="theme-toggle-btn">🌙</button>
             <div id="discord-auth" class="discord-auth">
