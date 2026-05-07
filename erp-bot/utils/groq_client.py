@@ -73,13 +73,18 @@ class GroqClient:
                 base_url="https://api.groq.com/openai/v1/chat/completions",
                 api_key=groq_key,
                 models=[
-                    "meta-llama/llama-4-scout-17b-16e-instruct",
-                    "llama-3.3-70b-versatile",
+                    # Preferred — better creative / less aligned, tried first.
                     "qwen/qwen3-32b",
                     "openai/gpt-oss-120b",
                     "openai/gpt-oss-20b",
-                    "llama-3.1-8b-instant",
                     "allam-2-7b",
+                    # Meta / Llama family — kept only as last-resort fallback.
+                    # The operator finds their ERP output mediocre; the cycler
+                    # only reaches them after every preferred model has hit
+                    # rate-limits or errors on this generation.
+                    "meta-llama/llama-4-scout-17b-16e-instruct",
+                    "llama-3.3-70b-versatile",
+                    "llama-3.1-8b-instant",
                 ],
             ))
 
