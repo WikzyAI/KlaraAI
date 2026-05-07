@@ -3,12 +3,34 @@ KlaraAI - ERP Discord Bot
 Bot works exclusively in DMs (Direct Messages).
 """
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import config
 import asyncio
+import itertools
 import traceback
 import os
 from utils.db import PostgresDB
+
+
+# Rotating presence — cycles every PRESENCE_INTERVAL seconds. Streaming type
+# is mandatory to keep the purple "Live" dot in Discord. The url must be a
+# valid twitch.tv / youtube.com URL for Discord to render the badge.
+PRESENCE_URL = "https://twitch.tv/klaraai"
+PRESENCE_INTERVAL = 45  # seconds — Discord rate-limits presence updates
+
+PRESENCE_ROTATION = [
+    "💋 ERP with Lilith",
+    "🌹 In Isabelle's bedroom",
+    "🔥 Chloé's late-night calls",
+    "✨ Uncensored 18+ AI",
+    "💎 /erp to begin",
+    "👑 Premium = unlimited",
+    "🌙 Strictly DMs",
+    "🎭 3 base + custom characters",
+    "💜 Long-term memory",
+    "🎟️ Invite friends, earn credits",
+    "🔥 Daily streak rewards",
+]
 
 
 class ERPBot(commands.Bot):
@@ -17,6 +39,7 @@ class ERPBot(commands.Bot):
         intents.message_content = True
         intents.dm_messages = True
         super().__init__(command_prefix="!", intents=intents)
+        self._presence_iter = itertools.cycle(PRESENCE_ROTATION)
 
     async def setup_hook(self):
         # Initialize PostgreSQL
@@ -51,6 +74,8 @@ class ERPBot(commands.Bot):
 
     async def cleanup(self):
         """Clean up resources on shutdown."""
+        if self.rotate_presence.is_running():
+            self.rotate_presence.cancel()
         await PostgresDB.close_db()
         print("[OK] Database pool closed")
 
@@ -65,13 +90,32 @@ class ERPBot(commands.Bot):
 
     async def on_ready(self):
         print(f"[OK] Logged in as {self.user} (ID: {self.user.id})")
-        await self.change_presence(
-            activity=discord.Activity(
-                type=discord.ActivityType.streaming,
-                name="ERP",
-                url="https://twitch.tv/klaraai"
+        # Set an initial presence immediately, then start the rotation loop.
+        await self._set_streaming_presence(next(self._presence_iter))
+        if not self.rotate_presence.is_running():
+            self.rotate_presence.start()
+
+    async def _set_streaming_presence(self, name: str):
+        try:
+            await self.change_presence(
+                status=discord.Status.online,
+                activity=discord.Streaming(
+                    name=name,
+                    url=PRESENCE_URL,
+                    details="Private 18+ ERP companion",
+                    platform="Twitch",
+                ),
             )
-        )
+        except Exception as e:
+            print(f"[Presence] change_presence failed: {e}")
+
+    @tasks.loop(seconds=PRESENCE_INTERVAL)
+    async def rotate_presence(self):
+        await self._set_streaming_presence(next(self._presence_iter))
+
+    @rotate_presence.before_loop
+    async def _before_rotate_presence(self):
+        await self.wait_until_ready()
 
     async def on_app_command_error(self, interaction: discord.Interaction, error):
         print(f"[ERROR] Slash command error: {error}")
