@@ -5,10 +5,10 @@
     "description": null,
     "sub_type": "premium",
     "credits": 0,
-    "daily_msgs_used": 3,
-    "daily_sessions_used": 0,
+    "daily_msgs_used": 61,
+    "daily_sessions_used": 1,
     "last_reset": "2026-05-04",
-    "response_length": "medium"
+    "response_length": "short"
   },
   "1480976129551499365": {
     "name": null,

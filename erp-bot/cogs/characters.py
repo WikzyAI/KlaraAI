@@ -6,17 +6,13 @@ Works in NSFW channels AND in DMs.
 import discord
 from discord import app_commands
 from discord.ext import commands
-import json
-import os
-from config import CHARACTERS_FILE
+from utils.db import PostgresDB
 
 
 def is_allowed_channel(interaction: discord.Interaction) -> bool:
     """Check if the command can be used here (NSFW channel or DM)."""
-    # Allow DMs
     if isinstance(interaction.channel, discord.DMChannel):
         return True
-    # In servers, require NSFW
     return interaction.channel.is_nsfw()
 
 
@@ -25,20 +21,6 @@ class Characters(commands.Cog):
     Cog for managing RP characters.
     Allows users to list characters and create custom ones.
     """
-
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.characters_file = CHARACTERS_FILE
-
-    def _load_characters(self) -> dict:
-        """Load characters from JSON file."""
-        with open(self.characters_file, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    def _save_characters(self, data: dict):
-        """Save characters to JSON file."""
-        with open(self.characters_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
 
     @app_commands.command(name="character", description="Manage RP characters")
     @app_commands.describe(
@@ -54,9 +36,6 @@ class Characters(commands.Cog):
     ])
     async def character(self, interaction: discord.Interaction, action: str,
                        name: str = None, description: str = None, personality: str = None):
-        """
-        Character management command dispatcher.
-        """
         await interaction.response.defer(thinking=True)
 
         if not is_allowed_channel(interaction):
@@ -77,7 +56,7 @@ class Characters(commands.Cog):
 
     async def _character_list(self, interaction: discord.Interaction):
         """List all available characters."""
-        characters = self._load_characters()
+        characters = await PostgresDB.get_all_characters()
 
         embed = discord.Embed(
             title="All Characters",
@@ -87,8 +66,9 @@ class Characters(commands.Cog):
 
         for key, char in characters.items():
             personality = char.get("personality", "N/A")
+            is_private = " 🔒" if char.get("creator") else ""
             embed.add_field(
-                name=f"{char['name']} ({key})",
+                name=f"{char['name']} ({key}){is_private}",
                 value=f"{char['desc']}\n*Traits: {personality}*",
                 inline=False
             )
@@ -98,7 +78,7 @@ class Characters(commands.Cog):
 
     async def _character_info(self, interaction: discord.Interaction, name: str):
         """Show detailed info about a specific character."""
-        characters = self._load_characters()
+        characters = await PostgresDB.get_all_characters()
         char_key = name.lower()
 
         if char_key not in characters:
@@ -114,13 +94,13 @@ class Characters(commands.Cog):
         )
         embed.add_field(name="Personality", value=char.get("personality", "N/A"), inline=False)
         embed.add_field(name="Key", value=f"`{char_key}`", inline=True)
-        embed.set_footer(text=f"Use /erp and click 'Start' to roleplay with this character")
+        embed.set_footer(text="Use /erp and click 'Start' to roleplay with this character")
 
         await interaction.followup.send(embed=embed)
 
     async def _character_create(self, interaction: discord.Interaction,
                                 name: str, description: str, personality: str):
-        """Create a custom character (bonus feature)."""
+        """Create a custom character."""
         if not name or not description:
             await interaction.followup.send(
                 "You must provide at least a name and description to create a character.\n"
@@ -129,24 +109,21 @@ class Characters(commands.Cog):
             )
             return
 
-        characters = self._load_characters()
         char_key = name.lower().replace(" ", "_")
 
-        if char_key in characters:
+        if await PostgresDB.character_exists(char_key):
             await interaction.followup.send(
                 f"A character with key '{char_key}' already exists. Choose a different name.",
                 ephemeral=True
             )
             return
 
-        # Create new character
-        characters[char_key] = {
+        await PostgresDB.set_character(char_key, {
             "name": name,
             "desc": description,
-            "personality": personality or "undefined"
-        }
-
-        self._save_characters(characters)
+            "personality": personality or "undefined",
+            "creator": str(interaction.user.id),
+        })
 
         embed = discord.Embed(
             title="Character Created!",
@@ -157,11 +134,10 @@ class Characters(commands.Cog):
         embed.add_field(name="Description", value=description, inline=False)
         if personality:
             embed.add_field(name="Personality", value=personality, inline=False)
-        embed.set_footer(text=f"Use /erp and click 'Start' to start roleplaying with your new character!")
+        embed.set_footer(text="Use /erp and click 'Start' to start roleplaying with your new character!")
 
         await interaction.followup.send(embed=embed)
 
 
-# Async setup function (required for load_extension in discord.py 2.0+)
 async def setup(bot: commands.Bot):
     await bot.add_cog(Characters(bot))

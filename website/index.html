@@ -29,7 +29,7 @@
          ============================================ -->
     <nav>
         <div class="nav-left">
-            <a href="index.html" class="nav-brand">💎 <span>KlaraAI</span></a>
+            <a href="index.html" class="nav-brand">✦ <span>KlaraAI</span></a>
             <ul class="nav-links">
                 <li><a href="index.html" class="active" data-i18n="nav_home">Accueil</a></li>
                 <li><a href="pricing.html" data-i18n="nav_pricing">Tarifs</a></li>
@@ -63,12 +63,16 @@
          ============================================ -->
     <section class="hero">
         <div class="hero-content">
+            <div class="hero-badge">
+                <span class="dot"></span>
+                <span>Bot online · 18+ verified · DM only</span>
+            </div>
             <h1 data-i18n="hero_title">KlaraAI</h1>
             <p data-i18n="hero_desc">Bot Discord d'ERP privé • Roleplay érotique avec IA • 18+</p>
             <div class="hero-buttons">
-                <a href="pricing.html" class="btn btn-primary btn-lg" data-i18n="hero_btn_pricing">Voir les tarifs</a>
-                <a href="buy-credits.html" class="btn btn-secondary btn-lg" data-i18n="hero_btn_buy">Acheter des crédits</a>
                 <a href="https://discord.com/api/oauth2/authorize?client_id=1500196432211349634&permissions=414464724032&scope=bot" class="btn btn-discord btn-lg" data-i18n="hero_btn_invite">🤖 Inviter le bot</a>
+                <a href="buy-credits.html" class="btn btn-primary btn-lg" data-i18n="hero_btn_buy">Acheter des crédits</a>
+                <a href="pricing.html" class="btn btn-secondary btn-lg" data-i18n="hero_btn_pricing">Voir les tarifs</a>
                 <button onclick="showCommands()" class="btn btn-secondary btn-lg" data-i18n="hero_btn_commands">📋 Commandes</button>
             </div>
         </div>
@@ -77,7 +81,7 @@
     <!-- ============================================
          FEATURES SECTION
          ============================================ -->
-    <section class="features">
+    <section class="features" id="features">
         <h2 class="section-title" data-i18n="feat_title">Fonctionnalités</h2>
         <p class="section-subtitle" data-i18n="feat_subtitle">Un bot Discord privé qui fonctionne exclusivement en messages privés (DM)</p>
         <div class="features-grid">
@@ -89,12 +93,12 @@
             <div class="feature-card">
                 <div class="feature-icon">🤖</div>
                 <h3 data-i18n="feat_ia_title">IA Avancée</h3>
-                <p data-i18n="feat_ia_desc">Réponses générées par IA (llama-3.3-70b) avec contexte mémorisé jusqu'à 50 messages.</p>
+                <p data-i18n="feat_ia_desc">Réponses générées par IA avec contexte mémorisé jusqu'à 50 messages.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">💬</div>
                 <h3 data-i18n="feat_auto_title">Réponse Automatique</h3>
-                <p data-i18n="feat_auto_desc">Une fois la séance lancée avec /erp start, le bot répond automatiquement à tous tes messages.</p>
+                <p data-i18n="feat_auto_desc">Lance une séance via /erp et le bot répond automatiquement à tous tes messages.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">🔒</div>
@@ -142,17 +146,20 @@
     <!-- ============================================
          DISCORD BOT CARD
          ============================================ -->
-    <section class="features">
+    <section>
         <div class="bot-card">
             <h3 data-i18n="bot_title">🤖 Utiliser le bot sur Discord</h3>
             <p data-i18n="bot_desc">Ajoute KlaraAI à tes contacts Discord et envoie-lui /help en DM pour commencer.<br>Le bot ne fonctionne qu'en messages privés (DM).</p>
             <div class="bot-features">
-                <div class="bot-feature" data-i18n="bot_help">📝 /help - Aide</div>
-                <div class="bot-feature" data-i18n="bot_profile">👤 /profile - Ton profil</div>
-                <div class="bot-feature" data-i18n="bot_premium">💎 /premium - Abonnement</div>
-                <div class="bot-feature" data-i18n="bot_start">🎭 /erp start - Commencer</div>
-                <div class="bot-feature" data-i18n="bot_end">🛑 /erp end - Terminer</div>
-                <div class="bot-feature" data-i18n="bot_list">📋 /erp list - Personnages</div>
+                <div class="bot-feature">📝 /help</div>
+                <div class="bot-feature">👤 /profile</div>
+                <div class="bot-feature">💎 /premium</div>
+                <div class="bot-feature">🎭 /erp</div>
+                <div class="bot-feature">⚙️ /settings</div>
+                <div class="bot-feature">📡 /ping</div>
+            </div>
+            <div style="margin-top: 2rem;">
+                <a href="https://discord.com/api/oauth2/authorize?client_id=1500196432211349634&permissions=414464724032&scope=bot" class="btn btn-discord btn-lg" data-i18n="hero_btn_invite">🤖 Inviter le bot</a>
             </div>
         </div>
     </section>

@@ -343,9 +343,7 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 window.addEventListener('scroll', function() {
     const nav = document.querySelector('nav');
     if (nav) {
-        nav.style.boxShadow = window.scrollY > 50
-            ? '0 2px 20px rgba(0,0,0,0.3)'
-            : 'none';
+        nav.classList.toggle('scrolled', window.scrollY > 30);
     }
 });
 

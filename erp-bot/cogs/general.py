@@ -13,41 +13,46 @@ class GeneralCog(commands.Cog):
     @app_commands.command(name="help", description="Show available commands")
     async def help(self, interaction: discord.Interaction):
         embed = discord.Embed(
-            title="KlaraAI - Help",
-            description="Private ERP bot that works exclusively in DMs.",
-            color=discord.Color.from_rgb(147, 112, 219)
+            title="✦ KlaraAI ✦",
+            description="*Your private uncensored ERP bot — DM only.*",
+            color=discord.Color.from_rgb(232, 67, 147)
         )
 
         embed.add_field(
-            name="Main Commands",
-            value="/help - Show this message\n"
-                  "/profile - View or update your profile\n"
-                  "/settings - Configure bot settings\n"
-                  "/premium - Manage your subscription\n"
-                  "/erp - Show ERP session manager (buttons)",
+            name="🎭 Main Commands",
+            value=(
+                "`/erp` — Open the session menu\n"
+                "`/profile` — View / edit your profile & credits\n"
+                "`/settings` — Tune response length & customs\n"
+                "`/premium` — Subscriptions & wallet\n"
+                "`/help` — This message\n"
+                "`/ping` — Check bot latency"
+            ),
             inline=False
         )
 
         embed.add_field(
-            name="ERP - Erotic Roleplay",
-            value="Use /erp to show the button menu\n"
-                  "• Click 'Start' to begin with a character\n"
-                  "• Click 'End' to close the session\n"
-                  "• Click 'List Characters' to see available characters\n"
-                  "• Click 'Character Info' for details\n"
-                  "• Create your own character in /settings (premium)",
+            name="🌹 How to Play",
+            value=(
+                "1. Run `/erp` and tap **Play**\n"
+                "2. Choose your companion\n"
+                "3. Just write — she replies automatically\n"
+                "4. Tap **End Session** to stop the scene"
+            ),
             inline=False
         )
 
         embed.add_field(
-            name="Notes",
-            value="• Bot only works in DMs\n"
-                  "• Once a session is started via /erp buttons, the bot replies automatically\n"
-                  "• Use /erp and click 'End' to stop",
+            name="💎 Get More",
+            value=(
+                "› Buy credits: [klaraai.vercel.app](https://klaraai.vercel.app/buy-credits.html)\n"
+                "› See plans: `/premium`\n"
+                "› Premium unlocks unlimited messages, custom characters, and Long responses"
+            ),
             inline=False
         )
 
-        embed.set_footer(text="KlaraAI • Made with ❤️")
+        embed.set_footer(text="KlaraAI • 18+ • Strictly DM-only")
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="ping", description="Check if the bot is online")

@@ -7,28 +7,21 @@ from discord import app_commands
 from discord.ext import commands
 import json
 import os
-from config import DEFAULT_CHARACTERS, CHARACTERS_FILE, SYSTEM_PROMPT, HISTORY_FILE, PROFILES_FILE
-from utils.db import HistoryDB, ProfilesDB
+from config import DEFAULT_CHARACTERS, SYSTEM_PROMPT
+from utils.db import PostgresDB
 from utils.groq_client import GroqClient
+from utils.ai_queue import AIQueue
 
 
 class ERPCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.groq = GroqClient()
-        self.characters_file = CHARACTERS_FILE
-        self.history_db = HistoryDB(HISTORY_FILE)
-        self.profiles_db = ProfilesDB(PROFILES_FILE)
-        self._ensure_characters_file()
+        self.ai_queue = AIQueue(self.groq)
+        self.characters_file = "characters.json"
 
-    def _ensure_characters_file(self):
-        if not os.path.exists(self.characters_file):
-            with open(self.characters_file, "w", encoding="utf-8") as f:
-                json.dump(DEFAULT_CHARACTERS, f, indent=2, ensure_ascii=False)
-
-    def _load_characters(self) -> dict:
-        with open(self.characters_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+    async def cog_load(self):
+        await self.ai_queue.start()
 
     def _build_messages(self, character: dict, history: list, user_profile: dict, context_limit: int) -> list:
         char_desc = character["desc"]
@@ -44,7 +37,6 @@ class ERPCog(commands.Cog):
         )
         messages = [{"role": "system", "content": system_content}]
 
-        # Use context_limit from subscription
         for entry in history[-context_limit:]:
             messages.append({"role": entry["role"], "content": entry["content"]})
 
@@ -54,11 +46,11 @@ class ERPCog(commands.Cog):
         user_id = message.author.id
         print(f"[DEBUG ERP] handle_dm_message called for {user_id}")
 
-        if not self.history_db.has_active_session(user_id):
+        if not await PostgresDB.has_active_session(user_id):
             print(f"[DEBUG ERP] No active session for {user_id}")
             return False
 
-        session = self.history_db.get_session(user_id)
+        session = await PostgresDB.get_session(user_id)
         if not session:
             print(f"[DEBUG ERP] Session None for {user_id}")
             return False
@@ -70,15 +62,16 @@ class ERPCog(commands.Cog):
             return False
 
         # CHECK DAILY LIMITS
-        if not self.profiles_db.can_send_message(user_id):
-            limits = self.profiles_db.get_limits(user_id)
+        if not await PostgresDB.can_send_message(user_id):
+            limits = await PostgresDB.get_limits(user_id)
             await message.channel.send(
                 f"❌ Daily message limit reached ({'unlimited' if limits['daily_msgs'] == -1 else limits['daily_msgs']})/day. "
                 f"Try again tomorrow or use `/premium` to upgrade your subscription."
             )
             return True
 
-        characters = self._load_characters()
+        # Load characters from DB
+        characters = await PostgresDB.get_all_characters()
         char_key = session.get("character")
         if char_key not in characters:
             print(f"[DEBUG ERP] Character {char_key} not found")
@@ -89,45 +82,49 @@ class ERPCog(commands.Cog):
         print(f"[DEBUG ERP] Character found: {character['name']}")
 
         # Get subscription limits
-        limits = self.profiles_db.get_limits(user_id)
-        max_tokens_limit = limits["max_tokens"]  # Upper bound from config
+        limits = await PostgresDB.get_limits(user_id)
+        max_tokens_limit = limits["max_tokens"]
         context_limit = limits["context"]
         allowed_lengths = limits.get("allowed_lengths", ["short"])
 
         # Adjust max_tokens based on response_length setting
-        profile = self.profiles_db.get_profile(user_id)
+        profile = await PostgresDB.get_profile(user_id)
         response_length = profile.get("response_length", "short")
 
-        # Force response_length to allowed value
         if response_length not in allowed_lengths:
-            response_length = allowed_lengths[0]  # Fallback to first allowed
-            self.profiles_db.update_profile(user_id, response_length=response_length)
+            response_length = allowed_lengths[0]
+            await PostgresDB.update_profile(user_id, response_length=response_length)
 
-        # Token mapping: short=400, medium=800, long=1200
         length_tokens = {"short": 400, "medium": 800, "long": 1200}
         desired_tokens = length_tokens.get(response_length, 400)
-
-        # Cap by the upper bound from config
         max_tokens = min(desired_tokens, max_tokens_limit)
 
         session["messages"].append({"role": "user", "content": message.content})
-        self.history_db.set_session(user_id, session)
+        await PostgresDB.set_session(user_id, session)
         print(f"[DEBUG ERP] User message added to history")
 
-        user_profile = self.profiles_db.get_profile(user_id)
+        user_profile = await PostgresDB.get_profile(user_id)
         messages = self._build_messages(character, session["messages"], user_profile, context_limit)
         print(f"[DEBUG ERP] Messages prepared for AI ({len(messages)} messages, context={context_limit}, tokens={max_tokens})")
 
+        sub_type = limits["type"]
         async with message.channel.typing():
-            print(f"[DEBUG ERP] Calling AI (Groq)...")
-            ai_response = self.groq.generate(messages, temperature=0.85, max_tokens=max_tokens)
+            print(f"[DEBUG ERP] Calling AI via queue (priority for {sub_type})...")
+            try:
+                ai_response = await self.ai_queue.enqueue(
+                    messages, 0.95, max_tokens, user_id, sub_type
+                )
+            except Exception as e:
+                print(f"[DEBUG ERP] AI request failed: {e}")
+                await message.channel.send("❌ The AI is taking too long to respond. Please try again in a moment.")
+                return
             print(f"[DEBUG ERP] AI response received ({len(ai_response)} chars): {ai_response[:100]}...")
 
         session["messages"].append({"role": "assistant", "content": ai_response})
-        self.history_db.set_session(user_id, session)
+        await PostgresDB.set_session(user_id, session)
 
         # Increment message counter
-        self.profiles_db.increment_messages(user_id)
+        await PostgresDB.increment_messages(user_id)
 
         # Send as plain text (not embed) - split if too long
         await self._send_split_message(message.channel, ai_response)
@@ -148,24 +145,21 @@ class ERPCog(commands.Cog):
 
         for char in text:
             current += char
-            # Split at sentence endings when we're near the limit
-            if len(current) >= MAX_LENGTH - 300 and char in sentence_endings:
+            # If we're near the limit and find a sentence ending, split here
+            if len(current) >= MAX_LENGTH - 500 and char in sentence_endings:
+                chunks.append(current)
+                current = ""
+            # Hard limit: never exceed MAX_LENGTH
+            elif len(current) >= MAX_LENGTH:
                 chunks.append(current)
                 current = ""
 
         if current:
             chunks.append(current)
 
-        # Merge short tail with previous chunk
-        merged = []
         for chunk in chunks:
-            if merged and len(chunk) < 100:
-                merged[-1] += chunk
-            else:
-                merged.append(chunk)
-
-        for chunk in merged:
-            await channel.send(chunk)
+            if chunk.strip():
+                await channel.send(chunk)
 
     # =======================================================================
     # SLASH COMMANDS
@@ -176,43 +170,56 @@ class ERPCog(commands.Cog):
         """Show ERP session manager with buttons."""
         await interaction.response.defer(thinking=True)
 
-        # Always show button menu
+        has_session = await PostgresDB.has_active_session(interaction.user.id)
+        limits = await PostgresDB.get_limits(interaction.user.id)
+
         embed = discord.Embed(
-            title="🎭 ERP Session Manager",
-            description="Click a button below to manage your ERP session.",
-            color=discord.Color.from_rgb(255, 105, 180)
+            title="✦ ERP Session Manager ✦",
+            description="*Step into your private playroom.* Pick an action below.",
+            color=discord.Color.from_rgb(232, 67, 147)
         )
 
-        # Check if user has active session
-        has_session = self.history_db.has_active_session(interaction.user.id)
         if has_session:
-            session = self.history_db.get_session(interaction.user.id)
+            session = await PostgresDB.get_session(interaction.user.id)
             char_name = session.get("character_name", "Unknown")
-            embed.add_field(name="Current Session", value=f"Active with **{char_name}**", inline=False)
+            embed.add_field(
+                name="🔥 Active Session",
+                value=f"**{char_name}** is waiting for you...",
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="💤 No Active Session",
+                value="Click **Play** to begin a new scene.",
+                inline=False
+            )
 
-        view = discord.ui.View()
+        embed.set_footer(text=f"Plan: {limits['name']} • Click any button to continue")
 
-        start_btn = discord.ui.Button(label="Start", style=discord.ButtonStyle.success, emoji="▶️")
-        start_btn.callback = lambda i: self._button_start(i)
-        view.add_item(start_btn)
+        view = discord.ui.View(timeout=300)
+
+        # Row 0: primary actions
+        play_btn = discord.ui.Button(
+            label="Play" if not has_session else "Switch",
+            style=discord.ButtonStyle.success,
+            emoji="🎭",
+            row=0
+        )
+        play_btn.callback = lambda i: self._button_start(i)
+        view.add_item(play_btn)
 
         if has_session:
-            end_btn = discord.ui.Button(label="End", style=discord.ButtonStyle.danger, emoji="⏹")
+            end_btn = discord.ui.Button(label="End Session", style=discord.ButtonStyle.danger, emoji="⛔", row=0)
             end_btn.callback = lambda i: self._button_end(i)
             view.add_item(end_btn)
 
-        list_btn = discord.ui.Button(label="List Characters", style=discord.ButtonStyle.primary, emoji="📋")
+        # Row 1: discovery
+        list_btn = discord.ui.Button(label="Browse", style=discord.ButtonStyle.primary, emoji="🌹", row=1)
         list_btn.callback = lambda i: self._button_list(i)
         view.add_item(list_btn)
 
-        info_btn = discord.ui.Button(label="Character Info", style=discord.ButtonStyle.secondary, emoji="ℹ️")
-        info_btn.callback = lambda i: self._button_info(i)
-        view.add_item(info_btn)
-
-        # Check if user can create custom chars
-        limits = self.profiles_db.get_limits(interaction.user.id)
         if limits["custom_chars"] != 0:
-            create_btn = discord.ui.Button(label="Create Character", style=discord.ButtonStyle.primary, emoji="🎭")
+            create_btn = discord.ui.Button(label="Create Character", style=discord.ButtonStyle.primary, emoji="✨", row=1)
             create_btn.callback = lambda i: self._button_create(i)
             view.add_item(create_btn)
 
@@ -227,45 +234,57 @@ class ERPCog(commands.Cog):
         await self._erp_end(interaction)
 
     def _is_character_visible(self, char_key: str, char_data: dict, user_id: str) -> bool:
-        """Check if a character is visible to the user (public or owned by user)."""
         creator = char_data.get("creator")
         if not creator:
-            return True  # Public character
+            return True
         return str(creator) == str(user_id)
 
-    def _get_visible_characters(self, user_id: str) -> dict:
-        """Get characters visible to the user (public + own private chars)."""
-        all_chars = self._load_characters()
+    async def _get_visible_characters(self, user_id: str) -> dict:
+        all_chars = await PostgresDB.get_all_characters()
         return {k: v for k, v in all_chars.items() if self._is_character_visible(k, v, user_id)}
 
     async def _button_list(self, interaction: discord.Interaction, show_buttons: bool = True):
         await interaction.response.defer(thinking=True)
         user_id = str(interaction.user.id)
-        characters = self._get_visible_characters(user_id)
-        limits = self.profiles_db.get_limits(user_id)
+        characters = await self._get_visible_characters(user_id)
 
         embed = discord.Embed(
-            title="Available Characters",
-            description="Click a character to start a session!",
-            color=discord.Color.from_rgb(147, 112, 219)
+            title="🌹 Choose Your Companion",
+            description="*Each one is waiting for a different kind of night...*",
+            color=discord.Color.from_rgb(232, 67, 147)
         )
 
-        for key, char in characters.items():
+        char_emojis = ["💋", "🔥", "💜", "🌙", "⚡", "🥀", "🍷", "🖤"]
+
+        for idx, (key, char) in enumerate(characters.items()):
             pers = char.get("personality", "N/A")
-            is_private = "🔒" if char.get("creator") else ""
+            emoji = char_emojis[idx % len(char_emojis)]
+            is_private = " 🔒" if char.get("creator") else ""
+            short_desc = char['desc'][:180] + ("..." if len(char['desc']) > 180 else "")
             embed.add_field(
-                name=f"{char['name']} ({key}) {is_private}",
-                value=f"{char['desc']}\n*Traits: {pers}*",
+                name=f"{emoji} {char['name']}{is_private}",
+                value=f"{short_desc}\n*— {pers}*",
                 inline=False
             )
 
+        embed.set_footer(text="Click a name below to start instantly")
+
         if show_buttons:
-            view = discord.ui.View()
-            for key, char in list(characters.items())[:5]:  # Limit to 5 buttons
+            view = discord.ui.View(timeout=300)
+            button_styles = [
+                discord.ButtonStyle.danger,
+                discord.ButtonStyle.success,
+                discord.ButtonStyle.primary,
+                discord.ButtonStyle.secondary,
+                discord.ButtonStyle.danger,
+            ]
+            for idx, (key, char) in enumerate(list(characters.items())[:5]):
+                emoji = char_emojis[idx % len(char_emojis)]
                 btn = discord.ui.Button(
-                    label=f"Start {char['name']}",
-                    style=discord.ButtonStyle.success,
-                    emoji="▶️"
+                    label=char['name'],
+                    style=button_styles[idx % len(button_styles)],
+                    emoji=emoji,
+                    row=idx // 3
                 )
                 btn.callback = lambda i, k=key: self._start_with_character(i, k)
                 view.add_item(btn)
@@ -275,8 +294,7 @@ class ERPCog(commands.Cog):
 
     async def _start_with_character(self, interaction: discord.Interaction, char_key: str):
         await interaction.response.defer(thinking=True)
-        # Check permission
-        characters = self._load_characters()
+        characters = await PostgresDB.get_all_characters()
         if char_key not in characters:
             await interaction.followup.send(f"❌ Character '{char_key}' not found.", ephemeral=True)
             return
@@ -288,55 +306,68 @@ class ERPCog(commands.Cog):
         await self._erp_start(interaction, char_key)
 
     async def _button_info(self, interaction: discord.Interaction):
-        await interaction.response.send_message("❌ Use `/erp` and click 'Character Info' to get info on a specific character.", ephemeral=True)
+        await interaction.response.send_message(
+            "❌ Use `/erp` and click 'Character Info' to get info on a specific character.",
+            ephemeral=True
+        )
 
     async def _button_create(self, interaction: discord.Interaction):
-        # Check if user can create custom characters
-        limits = self.profiles_db.get_limits(interaction.user.id)
+        limits = await PostgresDB.get_limits(interaction.user.id)
         custom_chars_allowed = limits["custom_chars"]
 
         if custom_chars_allowed == 0:
-            await interaction.response.send_message("❌ This feature requires **Standard** or **Premium** subscription. Use `/premium` for more info.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ This feature requires **Standard** or **Premium** subscription. Use `/premium` for more info.",
+                ephemeral=True
+            )
             return
 
-        # For Premium, check how many customs have been created
-        if custom_chars_allowed != -1:  # Not unlimited
-            characters = self._load_characters()
+        if custom_chars_allowed != -1:
+            characters = await PostgresDB.get_all_characters()
             user_chars = [k for k, v in characters.items() if v.get("creator") == str(interaction.user.id)]
             if len(user_chars) >= custom_chars_allowed:
-                await interaction.response.send_message(f"❌ Limit of {custom_chars_allowed} custom characters reached for your subscription.", ephemeral=True)
+                await interaction.response.send_message(
+                    f"❌ Limit of {custom_chars_allowed} custom characters reached for your subscription.",
+                    ephemeral=True
+                )
                 return
 
-        # Show modal for character creation
-        modal = CharacterCreateModal(self.db, self.characters_file)
+        modal = CharacterCreateModal()
         await interaction.response.send_modal(modal)
 
     async def _erp_start(self, interaction: discord.Interaction, character: str):
         if not character:
-            await interaction.followup.send("❌ You must specify a character. Use `/erp` and click 'List Characters'.", ephemeral=True)
+            await interaction.followup.send(
+                "❌ You must specify a character. Use `/erp` and click 'List Characters'.",
+                ephemeral=True
+            )
             return
 
-        characters = self._load_characters()
+        characters = await PostgresDB.get_all_characters()
         char_key = character.lower()
 
         if char_key not in characters:
-            await interaction.followup.send(f"❌ Character '{character}' not found. Use `/erp` and click 'List Characters'.", ephemeral=True)
+            await interaction.followup.send(
+                f"❌ Character '{character}' not found. Use `/erp` and click 'List Characters'.",
+                ephemeral=True
+            )
             return
 
-        # Check permission - private chars only usable by creator
         char = characters[char_key]
         creator = char.get("creator")
         if creator and str(creator) != str(interaction.user.id):
             await interaction.followup.send("❌ This is a private character. You cannot use it.", ephemeral=True)
             return
 
-        if self.history_db.has_active_session(interaction.user.id):
-            await interaction.followup.send("❌ You already have a session in progress. Use `/erp` and click 'End' to end it.", ephemeral=True)
+        if await PostgresDB.has_active_session(interaction.user.id):
+            await interaction.followup.send(
+                "❌ You already have a session in progress. Use `/erp` and click 'End' to end it.",
+                ephemeral=True
+            )
             return
 
-        # CHECK DAILY LIMITS
-        if not self.profiles_db.can_start_session(interaction.user.id):
-            limits = self.profiles_db.get_limits(interaction.user.id)
+        if not await PostgresDB.can_start_session(interaction.user.id):
+            limits = await PostgresDB.get_limits(interaction.user.id)
             await interaction.followup.send(
                 f"❌ Daily session limit reached ({'unlimited' if limits['daily_sessions'] == -1 else limits['daily_sessions']})/day. "
                 f"Try again tomorrow or use `/premium` to upgrade.",
@@ -344,74 +375,70 @@ class ERPCog(commands.Cog):
             )
             return
 
-        char = characters[char_key]
-
         session = {
             "character": char_key,
             "character_name": char["name"],
             "messages": []
         }
-        self.history_db.set_session(interaction.user.id, session)
-
-        # Increment session counter
-        self.profiles_db.increment_sessions(interaction.user.id)
+        await PostgresDB.set_session(interaction.user.id, session)
+        await PostgresDB.increment_sessions(interaction.user.id)
 
         embed = discord.Embed(
-            title=f"✅ ERP Session Started with {char['name']}",
-            description=f"{char['desc']}\n\n**Write your first message to begin!**\nThe bot will automatically reply to your messages.",
-            color=discord.Color.from_rgb(255, 105, 180)
+            title=f"💋 The scene begins with {char['name']}",
+            description=f"{char['desc']}\n\n**✨ Write your first message — she's listening.**",
+            color=discord.Color.from_rgb(232, 67, 147)
         )
-        embed.set_footer(text="Use /erp and click 'End' to end the session")
+        embed.set_footer(text="Use /erp → 'End Session' to leave the scene")
         await interaction.followup.send(embed=embed)
 
     async def _erp_end(self, interaction: discord.Interaction):
-        if not self.history_db.has_active_session(interaction.user.id):
+        if not await PostgresDB.has_active_session(interaction.user.id):
             await interaction.followup.send("❌ You have no active session.", ephemeral=True)
             return
 
-        session = self.history_db.get_session(interaction.user.id)
+        session = await PostgresDB.get_session(interaction.user.id)
         char_name = session.get("character_name", "Unknown")
 
-        self.history_db.delete_session(interaction.user.id)
+        await PostgresDB.delete_session(interaction.user.id)
 
         embed = discord.Embed(
-            title="✅ Session Ended",
-            description=f"Your session with **{char_name}** has ended. Thanks for playing!",
+            title="🌙 Scene Ended",
+            description=f"*The lights dim and **{char_name}** fades away...*\n\nThanks for the moment. Use `/erp` whenever you want to come back.",
             color=discord.Color.from_rgb(147, 112, 219)
         )
         await interaction.followup.send(embed=embed)
 
     async def _erp_list(self, interaction: discord.Interaction):
         user_id = str(interaction.user.id)
-        characters = self._get_visible_characters(user_id)
+        characters = await self._get_visible_characters(user_id)
 
         embed = discord.Embed(
             title="Available Characters",
-            description="Use  to begin.",
+            description="Use to begin.",
             color=discord.Color.from_rgb(147, 112, 219)
         )
 
         if not characters:
-            embed.description = "No characters available. Use  to create your own!"
+            embed.description = "No characters available. Use to create your own!"
         else:
             for key, char in characters.items():
                 pers = char.get("personality", "N/A")
                 is_private = " 🔒" if char.get("creator") else ""
                 embed.add_field(
                     name=f"{char['name']} ({key}){is_private}",
-                    value=f"{char['desc']}
-*Traits: {pers}*",
+                    value=f"{char['desc']}\n*Traits: {pers}*",
                     inline=False
                 )
 
         embed.set_footer(text="Use /erp to launch a session, then click 'Start'")
         await interaction.followup.send(embed=embed)
+
     async def _erp_info(self, interaction: discord.Interaction, character: str):
         if not character:
             await interaction.followup.send("❌ You must specify a character.", ephemeral=True)
             return
 
-        characters = self._load_characters()
+        characters = await PostgresDB.get_all_characters()
         char_key = character.lower()
 
         if char_key not in characters:
@@ -432,42 +459,41 @@ class ERPCog(commands.Cog):
 
     async def _erp_create(self, interaction: discord.Interaction,
                           name: str, description: str, personality: str):
-        # Check if user can create custom chars
-        limits = self.profiles_db.get_limits(interaction.user.id)
+        limits = await PostgresDB.get_limits(interaction.user.id)
         custom_chars_allowed = limits["custom_chars"]
 
         if custom_chars_allowed == 0:
-            await interaction.followup.send("❌ This feature requires **Standard** or **Premium** subscription. Use `/premium` for more info.", ephemeral=True)
+            await interaction.followup.send(
+                "❌ This feature requires **Standard** or **Premium** subscription. Use `/premium` for more info.",
+                ephemeral=True
+            )
             return
 
-        # For Premium, check how many customs have been created
-        if custom_chars_allowed != -1:  # Not unlimited
-            characters = self._load_characters()
+        if custom_chars_allowed != -1:
+            characters = await PostgresDB.get_all_characters()
             user_chars = [k for k, v in characters.items() if v.get("creator") == str(interaction.user.id)]
             if len(user_chars) >= custom_chars_allowed:
-                await interaction.followup.send(f"❌ Limit of {custom_chars_allowed} custom characters reached for your subscription.", ephemeral=True)
+                await interaction.followup.send(
+                    f"❌ Limit of {custom_chars_allowed} custom characters reached for your subscription.",
+                    ephemeral=True
+                )
                 return
 
         if not name or not description:
             await interaction.followup.send("❌ You must provide at least a name and a description.", ephemeral=True)
             return
 
-        characters = self._load_characters()
         char_key = name.lower().replace(" ", "_")
-
-        if char_key in characters:
+        if await PostgresDB.character_exists(char_key):
             await interaction.followup.send(f"❌ A character with key '{char_key}' already exists.", ephemeral=True)
             return
 
-        characters[char_key] = {
+        await PostgresDB.set_character(char_key, {
             "name": name,
             "desc": description,
             "personality": personality or "undefined",
-            "creator": str(interaction.user.id)
-        }
-
-        with open(self.characters_file, "w", encoding="utf-8") as f:
-            json.dump(characters, f, indent=2, ensure_ascii=False)
+            "creator": str(interaction.user.id),
+        })
 
         embed = discord.Embed(
             title="✅ Character Created!",
@@ -480,10 +506,8 @@ class ERPCog(commands.Cog):
 
 
 class CharacterCreateModal(discord.ui.Modal):
-    def __init__(self, characters_file):
+    def __init__(self):
         super().__init__(title="Create Custom Character")
-        self.characters_file = characters_file
-
         self.name_input = discord.ui.TextInput(
             label="Character Name",
             placeholder="Enter character name...",
@@ -509,26 +533,18 @@ class CharacterCreateModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
 
-        # Load characters
-        import json
-        with open(self.characters_file, "r", encoding="utf-8") as f:
-            characters = json.load(f)
-
         char_key = self.name_input.value.lower().replace(" ", "_")
 
-        if char_key in characters:
+        if await PostgresDB.character_exists(char_key):
             await interaction.followup.send(f"❌ A character with key '{char_key}' already exists.", ephemeral=True)
             return
 
-        characters[char_key] = {
+        await PostgresDB.set_character(char_key, {
             "name": self.name_input.value,
             "desc": self.desc_input.value,
             "personality": self.personality_input.value or "undefined",
-            "creator": str(interaction.user.id)
-        }
-
-        with open(self.characters_file, "w", encoding="utf-8") as f:
-            json.dump(characters, f, indent=2, ensure_ascii=False)
+            "creator": str(interaction.user.id),
+        })
 
         embed = discord.Embed(
             title="✅ Character Created!",
