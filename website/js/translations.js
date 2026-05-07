@@ -198,6 +198,7 @@ const translations = {
         footer_terms: "Conditions d'utilisation",
         footer_privacy: "Politique de confidentialité",
         footer_legal_notice: "Mentions légales",
+        footer_cookie_prefs: "🍪 Préférences cookies",
         footer_copyright: "© 2026 KlaraAI. Tous droits réservés. Site réservé aux adultes (18+).",
 
         // Features list
@@ -429,6 +430,7 @@ const translations = {
         footer_terms: "Terms of Service",
         footer_privacy: "Privacy Policy",
         footer_legal_notice: "Legal Notices",
+        footer_cookie_prefs: "🍪 Cookie preferences",
         footer_copyright: "© 2026 KlaraAI. All rights reserved. Site reserved for adults (18+).",
 
         // Features list
@@ -598,6 +600,7 @@ const translations = {
         footer_terms: "Términos de Servicio",
         footer_privacy: "Política de Privacidad",
         footer_legal_notice: "Avisos Legales",
+        footer_cookie_prefs: "🍪 Preferencias cookies",
         footer_copyright: "© 2026 KlaraAI. Todos los derechos reservados. Sitio reservado para adultos (18+).",
 
         // Features list
@@ -767,6 +770,7 @@ const translations = {
         footer_terms: "Termini di Servizio",
         footer_privacy: "Politica sulla Privacy",
         footer_legal_notice: "Avvisi Legali",
+        footer_cookie_prefs: "🍪 Preferenze cookie",
         footer_copyright: "© 2026 KlaraAI. Tutti i diritti riservati. Sito riservato agli adulti (18+).",
 
         // Features list

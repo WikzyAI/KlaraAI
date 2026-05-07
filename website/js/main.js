@@ -458,6 +458,121 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ============================================
+// Cookie / local-storage consent (GDPR)
+// ============================================
+// We use localStorage for: age verification, language, theme, Discord OAuth
+// token, and cookie consent itself. None of it is tracking, but EU rules
+// still require explicit consent for non-strictly-necessary storage.
+const CONSENT_KEY = 'klaraai_cookie_consent';
+const CONSENT_VALUES = { ACCEPTED: 'accepted', REJECTED: 'rejected' };
+
+function getCookieConsent() {
+    try { return localStorage.getItem(CONSENT_KEY); } catch (e) { return null; }
+}
+
+function hasCookieConsent() {
+    return getCookieConsent() === CONSENT_VALUES.ACCEPTED;
+}
+
+function injectCookieBanner() {
+    if (document.getElementById('cookie-banner')) return;
+    const lang = (localStorage.getItem('klaraai_lang') || 'fr').toLowerCase();
+    const t = {
+        fr: {
+            title: '🍪 Préférences de stockage',
+            body: "On utilise le stockage local de ton navigateur uniquement pour mémoriser ton thème, ta langue, ta vérification d'âge et ta connexion Discord. Aucun cookie publicitaire, aucun tracker tiers. Voir notre <a href=\"/privacy\">politique de confidentialité</a>.",
+            accept: 'Accepter',
+            reject: 'Refuser',
+        },
+        en: {
+            title: '🍪 Storage preferences',
+            body: 'We only use your browser local storage to remember your theme, language, age verification and Discord login. No advertising cookies, no third-party trackers. See our <a href="/privacy">privacy policy</a>.',
+            accept: 'Accept',
+            reject: 'Reject',
+        },
+        es: {
+            title: '🍪 Preferencias de almacenamiento',
+            body: 'Solo usamos el almacenamiento local del navegador para recordar tu tema, idioma, verificación de edad y sesión Discord. Sin cookies publicitarias ni rastreadores. Ver nuestra <a href="/privacy">política de privacidad</a>.',
+            accept: 'Aceptar',
+            reject: 'Rechazar',
+        },
+        it: {
+            title: '🍪 Preferenze di archiviazione',
+            body: 'Usiamo il local storage solo per ricordare tema, lingua, verifica età e login Discord. Nessun cookie pubblicitario, nessun tracker. Vedi la <a href="/privacy">privacy policy</a>.',
+            accept: 'Accetta',
+            reject: 'Rifiuta',
+        },
+    };
+    const i = t[lang] || t.en;
+    const div = document.createElement('div');
+    div.className = 'cookie-banner';
+    div.id = 'cookie-banner';
+    div.innerHTML = `
+        <div class="ck-title">${i.title}</div>
+        <p>${i.body}</p>
+        <div class="ck-actions">
+            <button class="ck-btn ck-reject" id="ck-reject">${i.reject}</button>
+            <button class="ck-btn ck-accept" id="ck-accept">${i.accept}</button>
+        </div>
+    `;
+    document.body.appendChild(div);
+    document.getElementById('ck-accept').addEventListener('click', () => acceptCookies());
+    document.getElementById('ck-reject').addEventListener('click', () => rejectCookies());
+    requestAnimationFrame(() => div.classList.add('visible'));
+}
+
+function showCookieBanner() {
+    injectCookieBanner();
+    const el = document.getElementById('cookie-banner');
+    if (el) el.classList.add('visible');
+}
+
+function hideCookieBanner() {
+    const el = document.getElementById('cookie-banner');
+    if (el) el.classList.remove('visible');
+    setTimeout(() => { if (el && el.parentNode) el.parentNode.removeChild(el); }, 400);
+}
+
+function acceptCookies() {
+    try { localStorage.setItem(CONSENT_KEY, CONSENT_VALUES.ACCEPTED); } catch (e) {}
+    hideCookieBanner();
+}
+
+function rejectCookies() {
+    // Wipe non-essential storage AND mark the choice. Keep ONLY the consent
+    // flag itself (so we don't re-prompt every reload — that would be hostile).
+    try {
+        const keysToWipe = [
+            'klaraai_age_verified',
+            'klaraai_lang',
+            'klaraai_theme',
+            'discord_access_token',
+            'discord_token_type',
+            'discord_token_expires',
+            'discord_user',
+        ];
+        keysToWipe.forEach(k => localStorage.removeItem(k));
+        localStorage.setItem(CONSENT_KEY, CONSENT_VALUES.REJECTED);
+    } catch (e) {}
+    // Logging out also resets the displayed UI
+    try { logoutDiscord(); } catch (e) {}
+    hideCookieBanner();
+}
+
+// Re-open the banner from the footer "Cookie preferences" link.
+function openCookiePreferences() {
+    showCookieBanner();
+}
+
+// Show the banner on first visit only.
+window.addEventListener('load', function () {
+    if (!getCookieConsent()) {
+        // Wait a beat so it doesn't fight the age-verify modal.
+        setTimeout(showCookieBanner, 600);
+    }
+});
+
+// ============================================
 // Live Activity Counter (simulated random walk)
 // ============================================
 // Goal: a believable "X active sessions" number that drifts realistically.

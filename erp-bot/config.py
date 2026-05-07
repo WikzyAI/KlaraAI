@@ -8,6 +8,8 @@ load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")  # fallback if Groq dies
+LLM_PRIMARY = os.getenv("LLM_PRIMARY", "groq")  # "groq" or "openrouter"
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 CHARACTERS_FILE = "characters.json"
