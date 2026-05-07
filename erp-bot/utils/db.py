@@ -131,7 +131,8 @@ class PostgresDB:
                     ADD COLUMN IF NOT EXISTS streak_max INT DEFAULT 0,
                     ADD COLUMN IF NOT EXISTS streak_last_day DATE,
                     ADD COLUMN IF NOT EXISTS referral_code TEXT,
-                    ADD COLUMN IF NOT EXISTS total_purchased_credits INT DEFAULT 0
+                    ADD COLUMN IF NOT EXISTS total_purchased_credits INT DEFAULT 0,
+                    ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'auto'
             """)
             await conn.execute("""
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_referral_code
@@ -184,7 +185,8 @@ class PostgresDB:
             )
             row = await conn.fetchrow(
                 "SELECT user_id, name, age, description, sub_type, credits, "
-                "daily_msgs_used, daily_sessions_used, last_reset, response_length "
+                "daily_msgs_used, daily_sessions_used, last_reset, response_length, "
+                "language "
                 "FROM profiles WHERE user_id = $1",
                 user_id
             )
@@ -241,18 +243,20 @@ class PostgresDB:
         for k, v in kwargs.items():
             if k in ("name", "age", "description", "sub_type", "credits",
                      "daily_msgs_used", "daily_sessions_used", "response_length",
-                     "last_reset"):
+                     "last_reset", "language"):
                 profile[k] = v
 
         async with pool.acquire() as conn:
             await conn.execute(
                 "UPDATE profiles SET name = $1, age = $2, description = $3, sub_type = $4, "
                 "credits = $5, daily_msgs_used = $6, daily_sessions_used = $7, "
-                "response_length = $8, last_reset = $9 WHERE user_id = $10",
+                "response_length = $8, last_reset = $9, language = $10 "
+                "WHERE user_id = $11",
                 profile.get("name"), profile.get("age"), profile.get("description"),
                 profile.get("sub_type"), profile.get("credits"),
                 profile.get("daily_msgs_used"), profile.get("daily_sessions_used"),
-                profile.get("response_length"), profile.get("last_reset"), user_id
+                profile.get("response_length"), profile.get("last_reset"),
+                profile.get("language") or "auto", user_id
             )
         return profile
 

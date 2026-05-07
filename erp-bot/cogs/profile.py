@@ -198,7 +198,14 @@ class ProfileCog(commands.Cog):
             value=length_names.get(response_length, response_length),
             inline=True
         )
-        embed.add_field(name="​", value="​", inline=True)  # spacer
+
+        lang_code = profile.get("language") or "auto"
+        lang_label = getattr(config, "LANGUAGE_LABELS", {}).get(lang_code, lang_code)
+        embed.add_field(
+            name="🌐 Language",
+            value=lang_label,
+            inline=True
+        )
 
         # Daily quota with exact reset countdown (skipped only when both
         # messages AND sessions are unlimited, e.g. Premium).
@@ -304,16 +311,25 @@ class ProfileCog(commands.Cog):
             allowed_lengths = limits.get("allowed_lengths", ["short"])
             custom_chars_allowed = limits["custom_chars"]
 
+            current_language = profile.get("language") or "auto"
+            language_labels = getattr(config, "LANGUAGE_LABELS", {"auto": "Auto"})
+
             embed = discord.Embed(
                 title="⚙️ Settings",
-                description="*Tune your experience.* Pick a response length below.",
+                description="*Tune your experience.* Pick a response length and language below.",
                 color=discord.Color.from_rgb(155, 89, 182)
             )
             embed.add_field(
                 name="📏 Current Length",
                 value=f"**{length_names.get(current_length, current_length)}**",
-                inline=False
+                inline=True
             )
+            embed.add_field(
+                name="🌐 Language",
+                value=f"**{language_labels.get(current_language, current_language)}**",
+                inline=True
+            )
+            embed.add_field(name="​", value="​", inline=True)  # spacer
             embed.add_field(
                 name="🎭 Custom Characters",
                 value="Unlimited" if custom_chars_allowed == -1 else f"{custom_chars_allowed} max",
@@ -327,6 +343,7 @@ class ProfileCog(commands.Cog):
 
             view = discord.ui.View(timeout=300)
 
+            # Row 0: response length
             length_emojis = {"short": "📝", "medium": "📄", "long": "📜"}
             for length in ["short", "medium", "long"]:
                 if length in allowed_lengths:
@@ -341,11 +358,34 @@ class ProfileCog(commands.Cog):
                     btn.callback = lambda i, l=length: self._set_response_length(i, l)
                     view.add_item(btn)
 
+            # Rows 1 & 2: language picker (Discord limits 5 buttons per row)
+            language_emojis = {
+                "auto": "🌐", "en": "🇬🇧", "fr": "🇫🇷", "es": "🇪🇸",
+                "it": "🇮🇹", "de": "🇩🇪", "pt": "🇵🇹",
+            }
+            language_short = {
+                "auto": "Auto", "en": "EN", "fr": "FR", "es": "ES",
+                "it": "IT", "de": "DE", "pt": "PT",
+            }
+            lang_codes = list(language_emojis.keys())
+            for idx, code in enumerate(lang_codes):
+                is_current = current_language == code
+                btn = discord.ui.Button(
+                    label=language_short[code] + (" ✓" if is_current else ""),
+                    style=discord.ButtonStyle.success if is_current else discord.ButtonStyle.secondary,
+                    emoji=language_emojis[code],
+                    row=1 + (idx // 5),  # rows 1 and 2
+                    disabled=is_current,
+                )
+                btn.callback = lambda i, c=code: self._set_language(i, c)
+                view.add_item(btn)
+
+            # Row 3: secondary action
             create_btn = discord.ui.Button(
                 label="Create Character",
                 style=discord.ButtonStyle.primary,
                 emoji="✨",
-                row=1
+                row=3
             )
             create_btn.callback = self._create_character_start
             view.add_item(create_btn)
@@ -360,6 +400,36 @@ class ProfileCog(commands.Cog):
                     await interaction.response.send_message("An error occurred. Please try again.", ephemeral=True)
                 else:
                     await interaction.followup.send("An error occurred. Please try again.", ephemeral=True)
+            except Exception:
+                pass
+
+    async def _set_language(self, interaction: discord.Interaction, code: str):
+        try:
+            await interaction.response.defer(thinking=True, ephemeral=True)
+            user_id = interaction.user.id
+            valid = set(getattr(config, "LANGUAGE_DIRECTIVES", {"auto": ""}).keys())
+            if code not in valid:
+                await interaction.followup.send("Unknown language.", ephemeral=True)
+                return
+            await asyncio.wait_for(
+                PostgresDB.update_profile(user_id, language=code),
+                timeout=10.0
+            )
+            label = config.LANGUAGE_LABELS.get(code, code)
+            embed = discord.Embed(
+                title="🌐 Language updated",
+                description=(
+                    f"From now on, the bot replies in **{label}**.\n"
+                    f"*This applies starting on your next message — no need to restart the scene.*"
+                ),
+                color=discord.Color.from_rgb(46, 204, 113)
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            print(f"[Settings] _set_language ERROR: {e}")
+            traceback.print_exc()
+            try:
+                await interaction.followup.send("An error occurred.", ephemeral=True)
             except Exception:
                 pass
 

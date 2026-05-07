@@ -8,7 +8,7 @@ from discord.ext import commands
 import json
 import os
 import asyncio
-from config import DEFAULT_CHARACTERS, SYSTEM_PROMPT
+from config import DEFAULT_CHARACTERS, SYSTEM_PROMPT, LANGUAGE_DIRECTIVES
 from utils.db import PostgresDB
 from utils.groq_client import GroqClient
 from utils.ai_queue import AIQueue
@@ -39,9 +39,17 @@ class ERPCog(commands.Cog):
         if memories:
             char_desc += format_memories_for_prompt(memories, character["name"])
 
+        # Resolve the language directive from the user's preference. Defaults
+        # to "auto" — the model mirrors whatever language the user wrote in.
+        lang_code = (user_profile or {}).get("language") or "auto"
+        if lang_code not in LANGUAGE_DIRECTIVES:
+            lang_code = "auto"
+        language_directive = LANGUAGE_DIRECTIVES[lang_code]
+
         system_content = SYSTEM_PROMPT.format(
             character_name=character["name"],
-            character_desc=char_desc
+            character_desc=char_desc,
+            language_directive=language_directive,
         )
         messages = [{"role": "system", "content": system_content}]
 
