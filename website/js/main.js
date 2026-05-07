@@ -130,6 +130,7 @@ async function fetchDiscordUser(token) {
 
             updateDiscordUI(user);
             updateCreditsDisplay(user);
+            loadUserDashboard(user);
         } else {
             console.error('Failed to fetch Discord user');
             logoutDiscord();
@@ -234,6 +235,69 @@ async function getUserCredits(discordId) {
     return data ? data.credits : 0;
 }
 
+async function loadUserDashboard(user) {
+    if (!user) return;
+    const panel = document.getElementById('user-dashboard');
+    if (!panel) return;
+
+    let dash = null;
+    try {
+        dash = await apiRequest(`/api/user/dashboard?discord_id=${user.id}`);
+    } catch (e) {
+        console.warn('[Dashboard] fetch failed:', e);
+    }
+
+    panel.style.display = 'block';
+
+    const avatarUrl = user.avatar
+        ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`
+        : `https://cdn.discordapp.com/embed/avatars/${(user.discriminator || 0) % 5}.png`;
+    const avatarEl = document.getElementById('dash-avatar');
+    if (avatarEl) avatarEl.src = avatarUrl;
+
+    const usernameEl = document.getElementById('dash-username');
+    if (usernameEl) usernameEl.textContent = user.username;
+
+    if (!dash) {
+        // Render empty defaults; avoid showing "Welcome —, 0/0/0".
+        document.getElementById('dash-credits').textContent = '0';
+        document.getElementById('dash-credits-usd').textContent = '$0.00';
+        document.getElementById('dash-total-purchased').textContent = '0';
+        document.getElementById('dash-referrals').textContent = '0';
+        return;
+    }
+
+    const credits = dash.credits || 0;
+    document.getElementById('dash-credits').textContent = credits.toLocaleString();
+    document.getElementById('dash-credits-usd').textContent = '$' + (credits / 100).toFixed(2);
+    document.getElementById('dash-total-purchased').textContent = (dash.total_purchased || 0).toLocaleString();
+    document.getElementById('dash-referrals').textContent = (dash.referral_count || 0);
+
+    const histWrap = document.getElementById('dash-history-wrap');
+    const histList = document.getElementById('dash-history-list');
+    const history = Array.isArray(dash.history) ? dash.history : [];
+    if (histWrap && histList && history.length) {
+        histList.innerHTML = '';
+        history.forEach(h => {
+            const li = document.createElement('li');
+            const amount = parseInt(h.amount) || 0;
+            const sign = amount >= 0 ? '+' : '';
+            const cls = amount >= 0 ? 'up' : 'down';
+            const date = h.timestamp ? new Date(h.timestamp).toLocaleDateString() : '';
+            const label = h.pack_name || (amount >= 0 ? 'Credits added' : 'Credits used');
+            li.innerHTML = `
+                <span class="h-amount ${cls}">${sign}${amount.toLocaleString()}</span>
+                <span class="h-label">${label.replace(/[<>]/g, '')}</span>
+                <span class="h-date">${date}</span>
+            `;
+            histList.appendChild(li);
+        });
+        histWrap.style.display = 'block';
+    } else if (histWrap) {
+        histWrap.style.display = 'none';
+    }
+}
+
 async function buyCredits(amount, packName, priceUSD) {
     if (!isDiscordLoggedIn()) {
         const warning = document.getElementById('login-warning');
@@ -313,6 +377,7 @@ window.addEventListener('load', function() {
         if (user) {
             updateDiscordUI(user);
             updateCreditsDisplay(user);
+            loadUserDashboard(user);
         } else {
             const token = localStorage.getItem('discord_access_token');
             if (token) fetchDiscordUser(token);
@@ -391,6 +456,86 @@ document.addEventListener('keydown', function(e) {
         closeCommands();
     }
 });
+
+// ============================================
+// Live Activity Counter (simulated random walk)
+// ============================================
+// Goal: a believable "X active sessions" number that drifts realistically.
+// - Range clamps: 95 .. 380
+// - Updates every 2-5s with small deltas (-3..+5 most of the time)
+// - Larger jumps (-12..+15) are rare (~5%)
+// - Drift toward a time-of-day target (more activity late evening/night)
+function startLiveCounter() {
+    const elCount = document.getElementById('live-count');
+    const elDelta = document.getElementById('live-delta');
+    if (!elCount) return;
+
+    const hour = new Date().getHours();
+    // Late-night / evening sees more sessions; mid-day fewer
+    const targetByHour = (h) => {
+        if (h >= 21 || h < 3) return 280;
+        if (h >= 18) return 220;
+        if (h >= 12) return 170;
+        if (h >= 7) return 140;
+        return 200; // 3am-7am: night-owl crowd
+    };
+    let target = targetByHour(hour);
+    let value = target + Math.floor(Math.random() * 40) - 20;
+
+    const render = (delta) => {
+        elCount.textContent = value;
+        if (delta !== 0 && elDelta) {
+            elDelta.textContent = (delta > 0 ? '+' : '') + delta;
+            elDelta.classList.toggle('up', delta > 0);
+            elDelta.classList.toggle('down', delta < 0);
+            elDelta.classList.add('show');
+            elCount.classList.toggle('bump-up', delta > 0);
+            elCount.classList.toggle('bump-down', delta < 0);
+            setTimeout(() => {
+                elDelta.classList.remove('show');
+                elCount.classList.remove('bump-up', 'bump-down');
+            }, 1400);
+        }
+    };
+
+    render(0);
+
+    const tick = () => {
+        const r = Math.random();
+        let delta;
+        if (r < 0.7) {
+            // Small natural breathing: -3 .. +5
+            delta = Math.floor(Math.random() * 9) - 3;
+        } else if (r < 0.95) {
+            // Moderate change: -6 .. +8
+            delta = Math.floor(Math.random() * 15) - 6;
+        } else {
+            // Rare burst (group joining / leaving): -12 .. +15
+            delta = Math.floor(Math.random() * 28) - 12;
+        }
+
+        // Gentle drift toward the time-of-day target so the value doesn't
+        // wander off forever
+        if (value < target - 60) delta += 1;
+        else if (value > target + 80) delta -= 1;
+
+        const newValue = Math.max(95, Math.min(380, value + delta));
+        const realDelta = newValue - value;
+        value = newValue;
+        render(realDelta);
+
+        // Refresh the time-of-day target every minute roughly
+        if (Math.random() < 0.02) target = targetByHour(new Date().getHours());
+
+        // Next tick in 2.0s - 5.0s
+        const nextDelay = 2000 + Math.random() * 3000;
+        setTimeout(tick, nextDelay);
+    };
+
+    setTimeout(tick, 1500);
+}
+
+window.addEventListener('load', startLiveCounter);
 
 console.log('%cKlaraAI Website', 'color: #9b59b6; font-size: 20px; font-weight: bold;');
 console.log('%cSite réservé aux 18+ ans', 'color: #e74c3c; font-size: 14px;');

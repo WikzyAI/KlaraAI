@@ -298,6 +298,54 @@ app.post('/api/users/update', async (req, res) => {
     res.json({ success: true, discord_id: user.id });
 });
 
+// Get full user dashboard: balance, total purchased, recent history
+app.get('/api/user/dashboard', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    let discordId, username;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        const u = await verifyDiscordToken(token);
+        if (!u) return res.status(401).json({ error: 'Invalid token' });
+        discordId = u.id;
+        username = u.username;
+    } else if (req.query.discord_id) {
+        discordId = String(req.query.discord_id);
+    } else {
+        return res.status(400).json({ error: 'Missing auth or discord_id' });
+    }
+
+    const data = readJSONDB();
+    const user = data.users[discordId];
+    if (!user) {
+        return res.json({
+            discord_id: discordId,
+            username: username || 'Unknown',
+            credits: 0,
+            total_purchased: 0,
+            history: [],
+            referral_count: 0,
+            referrer_granted: false
+        });
+    }
+    const history = (user.history || [])
+        .filter(h => h && h.amount)
+        .slice(-8)
+        .reverse();
+    const referralCount = Object.values(data.users)
+        .filter(u => String(u.referrer_id) === String(discordId)).length;
+
+    res.json({
+        discord_id: discordId,
+        username: user.username || username || 'Unknown',
+        credits: user.credits || 0,
+        total_purchased: user.total_purchased || 0,
+        history,
+        referral_count: referralCount,
+        referrer_granted: !!user.referrer_granted
+    });
+});
+
 // Get leaderboard
 app.get('/api/leaderboard', (req, res) => {
     const data = readJSONDB();

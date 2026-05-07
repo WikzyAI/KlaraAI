@@ -59,6 +59,52 @@
     </nav>
 
     <!-- ============================================
+         USER DASHBOARD (logged-in only)
+         ============================================ -->
+    <section class="user-dashboard" id="user-dashboard" style="display: none;">
+        <div class="dash-card">
+            <div class="dash-header">
+                <img id="dash-avatar" class="dash-avatar" src="" alt="">
+                <div class="dash-greeting">
+                    <span class="dash-hello" data-i18n="dash_hello">Welcome back,</span>
+                    <strong id="dash-username">—</strong>
+                </div>
+                <div class="dash-spacer"></div>
+                <a href="https://discord.com/users/1500196432211349634" target="_blank" rel="noopener" class="btn btn-primary btn-sm" data-i18n="dash_chat_btn">💬 Chat now</a>
+            </div>
+
+            <div class="dash-stats">
+                <div class="dash-stat dash-stat-primary">
+                    <div class="dash-stat-label" data-i18n="dash_balance">Balance</div>
+                    <div class="dash-stat-value" id="dash-credits">0</div>
+                    <div class="dash-stat-sub"><span id="dash-credits-usd">$0.00</span></div>
+                </div>
+                <div class="dash-stat">
+                    <div class="dash-stat-label" data-i18n="dash_purchased">Total purchased</div>
+                    <div class="dash-stat-value" id="dash-total-purchased">0</div>
+                    <div class="dash-stat-sub" data-i18n="dash_credits_lifetime">credits, lifetime</div>
+                </div>
+                <div class="dash-stat">
+                    <div class="dash-stat-label" data-i18n="dash_referrals">Referrals</div>
+                    <div class="dash-stat-value" id="dash-referrals">0</div>
+                    <div class="dash-stat-sub" data-i18n="dash_friends_invited">friends invited</div>
+                </div>
+            </div>
+
+            <div class="dash-actions">
+                <a href="buy-credits.html" class="btn btn-secondary btn-sm" data-i18n="nav_buy_credits">Buy credits</a>
+                <a href="pricing.html" class="btn btn-secondary btn-sm" data-i18n="nav_pricing">Pricing</a>
+                <a href="#rewards" class="btn btn-secondary btn-sm" data-i18n="dash_rewards_btn">🎟️ Get my code</a>
+            </div>
+
+            <details class="dash-history" id="dash-history-wrap" style="display: none;">
+                <summary data-i18n="dash_recent_activity">Recent activity</summary>
+                <ul class="dash-history-list" id="dash-history-list"></ul>
+            </details>
+        </div>
+    </section>
+
+    <!-- ============================================
          HERO SECTION
          ============================================ -->
     <section class="hero">
@@ -66,6 +112,12 @@
             <div class="hero-badge">
                 <span class="dot"></span>
                 <span>Bot online · 18+ verified · DM only</span>
+            </div>
+            <div class="live-counter" id="live-counter">
+                <span class="live-pulse"></span>
+                <span class="live-count" id="live-count">—</span>
+                <span class="live-label" data-i18n="live_label">active sessions right now</span>
+                <span class="live-delta" id="live-delta"></span>
             </div>
             <h1 data-i18n="hero_title">KlaraAI</h1>
             <p data-i18n="hero_desc">Bot Discord d'ERP privé • Roleplay érotique avec IA • 18+</p>
@@ -117,6 +169,76 @@
                 <p data-i18n="feat_nsfw_desc">Contenu érotique explicite autorisé et encouragé en DM. Aucune censure, aucune restriction.</p>
             </div>
         </div>
+    </section>
+
+    <!-- ============================================
+         CHARACTER GALLERY
+         ============================================ -->
+    <section class="characters" id="characters">
+        <h2 class="section-title" data-i18n="chars_title">Meet your companions</h2>
+        <p class="section-subtitle" data-i18n="chars_subtitle">Three default characters, each with their own voice. Premium unlocks unlimited custom personas.</p>
+
+        <div class="characters-grid">
+            <!-- Lilith -->
+            <article class="char-card char-lilith">
+                <div class="char-portrait">
+                    <span class="char-emoji">💋</span>
+                </div>
+                <div class="char-tags">
+                    <span class="char-tag char-tag-hot">Succube</span>
+                    <span class="char-tag">Dominant</span>
+                    <span class="char-tag">Mysterious</span>
+                </div>
+                <h3>Lilith</h3>
+                <p class="char-bio" data-i18n="char_lilith_bio">A demoness born from shadow — purple skin, obsidian horns, eyes that burn with eternal hunger. Her voice is a spell.</p>
+                <blockquote class="char-quote" data-i18n="char_lilith_quote">
+                    <span class="quote-action">*She steps from the dark, lips curling into a slow, knowing smile.*</span>
+                    "Mmm... I've been waiting for someone like you, mortal."
+                    <span class="quote-action">*Her tail coils once around your wrist.*</span>
+                </blockquote>
+                <a href="https://discord.com/users/1500196432211349634" target="_blank" rel="noopener" class="btn btn-secondary char-cta" data-i18n="char_cta">Start with her →</a>
+            </article>
+
+            <!-- Isabelle -->
+            <article class="char-card char-isabelle">
+                <div class="char-portrait">
+                    <span class="char-emoji">🌹</span>
+                </div>
+                <div class="char-tags">
+                    <span class="char-tag char-tag-hot">Belle-mère</span>
+                    <span class="char-tag">Sophisticated</span>
+                    <span class="char-tag">Forbidden</span>
+                </div>
+                <h3>Isabelle</h3>
+                <p class="char-bio" data-i18n="char_isabelle_bio">42, elegant, brunette. The kind of stepmom who keeps the house immaculate and the tension unbearable. Her smile says everything.</p>
+                <blockquote class="char-quote" data-i18n="char_isabelle_quote">
+                    <span class="quote-action">*She glances toward the door before letting her hand rest on yours, just a little too long.*</span>
+                    "We shouldn't... but no one needs to know, sweetheart."
+                </blockquote>
+                <a href="https://discord.com/users/1500196432211349634" target="_blank" rel="noopener" class="btn btn-secondary char-cta" data-i18n="char_cta">Start with her →</a>
+            </article>
+
+            <!-- Chloé -->
+            <article class="char-card char-chloe">
+                <div class="char-portrait">
+                    <span class="char-emoji">🔥</span>
+                </div>
+                <div class="char-tags">
+                    <span class="char-tag char-tag-hot">Belle-sœur</span>
+                    <span class="char-tag">Playful</span>
+                    <span class="char-tag">Provocative</span>
+                </div>
+                <h3>Chloé</h3>
+                <p class="char-bio" data-i18n="char_chloe_bio">24, art student, the spark in every family dinner. Wears oversized t-shirts that hide nothing on purpose. Loves to push every line.</p>
+                <blockquote class="char-quote" data-i18n="char_chloe_quote">
+                    <span class="quote-action">*She drops onto your bed without knocking, smirking.*</span>
+                    "Bro, your door wasn't locked. Want to keep me company tonight or what?"
+                </blockquote>
+                <a href="https://discord.com/users/1500196432211349634" target="_blank" rel="noopener" class="btn btn-secondary char-cta" data-i18n="char_cta">Start with her →</a>
+            </article>
+        </div>
+
+        <p class="characters-footer" data-i18n="chars_footer">💎 <strong>Standard</strong> = 2 custom characters · <strong>Premium</strong> = unlimited custom characters with unique personalities.</p>
     </section>
 
     <!-- ============================================
@@ -266,6 +388,56 @@
                 </ul>
                 <a href="buy-credits.html" class="btn btn-primary" data-i18n="btn_buy">Acheter</a>
             </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         FAQ
+         ============================================ -->
+    <section class="faq" id="faq">
+        <h2 class="section-title" data-i18n="faq_title">Frequently asked questions</h2>
+        <p class="section-subtitle" data-i18n="faq_subtitle">Everything you might be wondering before getting started.</p>
+
+        <div class="faq-list">
+            <details class="faq-item">
+                <summary data-i18n="faq_q_private">Is my conversation really private?</summary>
+                <div class="faq-answer" data-i18n="faq_a_private">Yes. The bot only operates in your Discord DMs — there is no public log, no shared server, no other users seeing your scenes. Memories are tied to your Discord ID and you can wipe them anytime via <code>/memories</code>. We never sell your data and never train AI on your conversations.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary data-i18n="faq_q_credits">How does the credit system work?</summary>
+                <div class="faq-answer" data-i18n="faq_a_credits"><strong>100 credits = 1 USD.</strong> You can buy credits one-shot (Starter, Popular, Pro, Elite) or subscribe monthly (Standard 1600 cr/mo, Premium 3200 cr/mo). Credits never expire. Subscriptions auto-renew until you cancel — and you can cancel anytime from <code>/premium</code>.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary data-i18n="faq_q_uncensored">Is the AI really uncensored?</summary>
+                <div class="faq-answer" data-i18n="faq_a_uncensored">Yes. KlaraAI uses a custom system prompt + automatic refusal-detection retry that keeps the model fully in-character even on explicit scenes. The bot will never moralize, warn, or break character. The only hard line is illegal content (minors, real-person targeting) — that's non-negotiable, everywhere on the planet.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary data-i18n="faq_q_memory">Does the bot remember me between sessions?</summary>
+                <div class="faq-answer" data-i18n="faq_a_memory">Yes — this is one of our core differentiators. When you end a scene with <code>/erp</code> → End Session, an AI summarizer extracts 3-8 durable facts (your name, established kinks, key moments) and saves them. Next time you start a scene with that character, those memories are injected into her system prompt for true continuity. Rare in Discord-native bots.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary data-i18n="faq_q_vs_free">Why pay when JanitorAI / Character.ai are free?</summary>
+                <div class="faq-answer" data-i18n="faq_a_vs_free">Three reasons: (1) <strong>persistent long-term memory</strong> across sessions, which most free competitors don't offer; (2) <strong>truly uncensored</strong> output — no creative-writing filters that pop in mid-scene; (3) <strong>Discord-native</strong> — no separate app, no signup, the conversation lives where you already are. Free tier of KlaraAI lets you try before paying.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary data-i18n="faq_q_custom">Can I create my own characters?</summary>
+                <div class="faq-answer" data-i18n="faq_a_custom"><strong>Standard</strong> users can create up to 2 custom characters. <strong>Premium</strong> users get unlimited custom characters with full control over name, description, and personality. Use <code>/erp</code> → Create Character to build one in under a minute.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary data-i18n="faq_q_age">Why the age verification?</summary>
+                <div class="faq-answer" data-i18n="faq_a_age">KlaraAI generates explicit adult content. Access is strictly reserved to users aged 18+ (or the age of majority in your jurisdiction). The age gate is required by law and by every payment processor. By using the service you confirm you are an adult — false declarations are your own legal risk.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary data-i18n="faq_q_refund">What about refunds?</summary>
+                <div class="faq-answer" data-i18n="faq_a_refund">Credits are consumed instantly upon purchase, so all sales are final by default — like any digital consumable. Exceptions: proven duplicate charges or proven service failure are refunded. Reach out at the support email in our <a href="terms.html">Terms</a> if you have an issue.</div>
+            </details>
         </div>
     </section>
 
