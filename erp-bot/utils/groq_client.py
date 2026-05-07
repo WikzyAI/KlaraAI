@@ -106,13 +106,13 @@ class GroqClient:
                     "openai/gpt-oss-120b",
                     "openai/gpt-oss-20b",
                     "allam-2-7b",
-                    # Meta / Llama family — kept only as last-resort fallback.
-                    # The operator finds their ERP output mediocre; the cycler
-                    # only reaches them after every preferred model has hit
-                    # rate-limits or errors on this generation.
-                    "meta-llama/llama-4-scout-17b-16e-instruct",
-                    "llama-3.3-70b-versatile",
-                    "llama-3.1-8b-instant",
+                    # Meta / Llama family — TEMPORARILY DISABLED.
+                    # They ignored the language directive (replied in EN even
+                    # when user picked FR) and gave mediocre ERP output. We'll
+                    # bring them back later if/when nothing else is available.
+                    # "meta-llama/llama-4-scout-17b-16e-instruct",
+                    # "llama-3.3-70b-versatile",
+                    # "llama-3.1-8b-instant",
                 ],
             ))
 

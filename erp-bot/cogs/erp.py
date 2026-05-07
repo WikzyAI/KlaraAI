@@ -26,6 +26,13 @@ class ERPCog(commands.Cog):
     async def cog_load(self):
         await self.ai_queue.start()
 
+    # Hard cap on the total char count of the chat history we send.
+    # Some Groq models (qwen3-32b, gpt-oss-20b, allam-2-7b) reject large
+    # payloads with HTTP 413. ~22k chars ≈ 5500 tokens which fits
+    # comfortably in any 8k-context model alongside the system prompt
+    # and the requested max_tokens output.
+    MAX_HISTORY_CHARS = 22000
+
     def _build_messages(self, character: dict, history: list, user_profile: dict,
                         context_limit: int, memories: list = None) -> list:
         char_desc = character["desc"]
@@ -53,7 +60,20 @@ class ERPCog(commands.Cog):
         )
         messages = [{"role": "system", "content": system_content}]
 
-        for entry in history[-context_limit:]:
+        # Take the last N messages then trim from the OLDEST end if the total
+        # char count exceeds the cap — keeps the most recent context intact.
+        history_slice = list(history[-context_limit:])
+        total_chars = sum(len(m.get("content", "")) for m in history_slice)
+        dropped = 0
+        while total_chars > self.MAX_HISTORY_CHARS and len(history_slice) > 1:
+            removed = history_slice.pop(0)
+            total_chars -= len(removed.get("content", ""))
+            dropped += 1
+        if dropped:
+            print(f"[ERP] Trimmed {dropped} oldest messages to fit context cap "
+                  f"({total_chars} chars / {self.MAX_HISTORY_CHARS})")
+
+        for entry in history_slice:
             messages.append({"role": entry["role"], "content": entry["content"]})
 
         return messages
