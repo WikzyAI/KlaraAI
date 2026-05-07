@@ -147,9 +147,48 @@ class ERPCog(commands.Cog):
 
         # Streak: bump and reward on milestones (background, never blocks the reply)
         asyncio.create_task(self._handle_streak(message, user_id, user_profile))
+        # Referral activity gate: grant the gated signup bonus once the referee
+        # has sent enough ERP messages.
+        asyncio.create_task(self._handle_referral_activity(message, user_id, user_profile))
 
         print(f"[DEBUG ERP] Response sent successfully")
         return True
+
+    async def _handle_referral_activity(self, message: discord.Message, user_id: int, user_profile: dict):
+        try:
+            # Only proceed if the user actually has an unfulfilled referral.
+            row = await PostgresDB.increment_referee_msg_count(user_id)
+            if row is None:
+                return
+            if row["signup_bonus_granted"]:
+                return
+
+            # Late-bound to avoid circular config: grab the gate + bonus from social cog constants.
+            from cogs.social import REFEREE_ACTIVITY_GATE, REFEREE_SIGNUP_BONUS
+            if (row["referee_msg_count"] or 0) < REFEREE_ACTIVITY_GATE:
+                return
+
+            username = user_profile.get("name") or message.author.name
+            granted = await asyncio.to_thread(
+                add_credits, str(user_id), REFEREE_SIGNUP_BONUS, username,
+                "Referral signup bonus (activated)"
+            )
+            if granted.get("success", False):
+                await PostgresDB.mark_signup_bonus_granted(user_id)
+                embed = discord.Embed(
+                    title="🎉 Referral bonus unlocked!",
+                    description=(
+                        f"You just earned **+{REFEREE_SIGNUP_BONUS} credits** for being active.\n"
+                        f"*Your referrer also gets a reward when you spend `$5+`.*"
+                    ),
+                    color=discord.Color.from_rgb(46, 204, 113)
+                )
+                try:
+                    await message.channel.send(embed=embed)
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[Referral] Activity gate failed: {e}")
 
     async def _handle_streak(self, message: discord.Message, user_id: int, user_profile: dict):
         try:

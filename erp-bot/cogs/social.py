@@ -4,6 +4,7 @@ Both commands are button-driven, matching the rest of the bot.
 """
 import asyncio
 import traceback
+from datetime import datetime, timezone
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -11,10 +12,13 @@ from discord.ext import commands
 from utils.db import PostgresDB
 from utils.api_client import add_credits, set_referrer
 
-# How many credits each side gets. Tuned to keep unit economics positive.
-REFEREE_SIGNUP_BONUS = 50      # given to the new user when they apply a code
-REFERRER_PURCHASE_BONUS = 200  # given to the referrer once referee buys >= $5
-REFERRER_PURCHASE_THRESHOLD = 500  # in credits ($5 worth)
+# Tuned to keep unit economics positive AND deter sock-puppet farming.
+REFEREE_SIGNUP_BONUS = 25                # credits, granted only AFTER the gate
+REFEREE_ACTIVITY_GATE = 5                # ERP messages required before signup bonus
+REFERRER_PURCHASE_BONUS = 200            # credits, on first $5+ purchase by referee
+REFERRER_PURCHASE_THRESHOLD = 500        # in credits ($5 worth)
+MIN_DISCORD_ACCOUNT_AGE_DAYS = 14        # block fresh sock-puppets
+MAX_REFERRALS_PER_CODE = 100             # lifetime cap per referrer
 
 
 class SocialCog(commands.Cog):
@@ -41,8 +45,8 @@ class SocialCog(commands.Cog):
             embed = discord.Embed(
                 title="✦ Your Referral Code ✦",
                 description=(
-                    f"Share your code — when a friend uses it and makes a purchase of "
-                    f"`$5+`, **you both win**.\n\n"
+                    f"Share your code — invite real friends, earn credits when they "
+                    f"actually use the bot.\n\n"
                     f"**Your code:** `{code}`"
                 ),
                 color=discord.Color.from_rgb(232, 67, 147)
@@ -50,8 +54,18 @@ class SocialCog(commands.Cog):
             embed.add_field(
                 name="🎁 Rewards",
                 value=(
-                    f"› They get **+{REFEREE_SIGNUP_BONUS} credits** the moment they apply your code\n"
+                    f"› They get **+{REFEREE_SIGNUP_BONUS} credits** "
+                    f"after sending {REFEREE_ACTIVITY_GATE} messages in `/erp`\n"
                     f"› You get **+{REFERRER_PURCHASE_BONUS} credits** when they spend `$5+`"
+                ),
+                inline=False
+            )
+            embed.add_field(
+                name="🛡️ Anti-fraud",
+                value=(
+                    f"› Referee's Discord account must be **≥{MIN_DISCORD_ACCOUNT_AGE_DAYS} days old**\n"
+                    f"› One code per new user · Self-referrals blocked\n"
+                    f"› Lifetime cap: **{MAX_REFERRALS_PER_CODE}** uses per code"
                 ),
                 inline=False
             )
@@ -112,6 +126,21 @@ class SocialCog(commands.Cog):
             return
 
         user_id = interaction.user.id
+
+        # Anti-fraud #1: Discord account age must be ≥ MIN_DISCORD_ACCOUNT_AGE_DAYS.
+        try:
+            account_age = datetime.now(timezone.utc) - interaction.user.created_at
+            if account_age.days < MIN_DISCORD_ACCOUNT_AGE_DAYS:
+                await interaction.followup.send(
+                    f"❌ Your Discord account must be at least "
+                    f"**{MIN_DISCORD_ACCOUNT_AGE_DAYS} days old** to use a referral code.\n"
+                    f"*(Current age: {account_age.days} day{'s' if account_age.days != 1 else ''}.)*",
+                    ephemeral=True
+                )
+                return
+        except Exception as e:
+            print(f"[Referral] Age check failed: {e}")
+
         if await PostgresDB.has_used_referral(user_id):
             await interaction.followup.send(
                 "❌ You've already used a referral code. Only one per account.",
@@ -125,6 +154,15 @@ class SocialCog(commands.Cog):
             return
         if int(referrer_id) == int(user_id):
             await interaction.followup.send("❌ You can't refer yourself, smart guy.", ephemeral=True)
+            return
+
+        # Anti-fraud #2: per-code lifetime cap.
+        ref_stats = await PostgresDB.get_referral_stats(referrer_id)
+        if ref_stats["total"] >= MAX_REFERRALS_PER_CODE:
+            await interaction.followup.send(
+                f"❌ This code has reached its limit of **{MAX_REFERRALS_PER_CODE}** uses.",
+                ephemeral=True
+            )
             return
 
         recorded = await PostgresDB.record_referral(user_id, referrer_id, code)
@@ -141,28 +179,21 @@ class SocialCog(commands.Cog):
         except Exception as e:
             print(f"[Referral] set_referrer API call failed: {e}")
 
-        # Grant the signup bonus to the referee right away
-        username = interaction.user.name
-        result = await asyncio.to_thread(
-            add_credits, str(user_id), REFEREE_SIGNUP_BONUS, username,
-            f"Referral signup bonus (code {code})"
+        # Anti-fraud #3: signup bonus is GATED behind {REFEREE_ACTIVITY_GATE} ERP
+        # messages. We only record the link here; the bonus is granted later
+        # from the ERP cog when the user actually engages.
+        embed = discord.Embed(
+            title="🎟️ Code linked",
+            description=(
+                f"Your referral is registered.\n\n"
+                f"› Send **{REFEREE_ACTIVITY_GATE} messages in `/erp`** and you'll receive "
+                f"**+{REFEREE_SIGNUP_BONUS} credits**.\n"
+                f"› When you spend `$5+`, your referrer also gets a reward."
+            ),
+            color=discord.Color.from_rgb(46, 204, 113)
         )
-        if result.get("success", False):
-            await PostgresDB.mark_signup_bonus_granted(user_id)
-            embed = discord.Embed(
-                title="🎉 Code applied!",
-                description=(
-                    f"You just earned **+{REFEREE_SIGNUP_BONUS} credits**.\n"
-                    f"When you make a purchase of `$5+`, your referrer also gets a reward."
-                ),
-                color=discord.Color.from_rgb(46, 204, 113)
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        else:
-            await interaction.followup.send(
-                "⚠️ Code applied but the credit grant failed. Contact support.",
-                ephemeral=True
-            )
+        embed.set_footer(text="The bonus is delivered automatically after activity.")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     # ============================================================
     # /memories

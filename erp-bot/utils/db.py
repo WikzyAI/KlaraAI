@@ -111,9 +111,14 @@ class PostgresDB:
                     code_used TEXT NOT NULL,
                     signup_bonus_granted BOOL DEFAULT FALSE,
                     purchase_bonus_granted BOOL DEFAULT FALSE,
+                    referee_msg_count INT DEFAULT 0,
                     created_at TIMESTAMPTZ DEFAULT NOW()
                 )
             """)
+            # Idempotent: add the column if upgrading from a previous version.
+            await conn.execute(
+                "ALTER TABLE referrals ADD COLUMN IF NOT EXISTS referee_msg_count INT DEFAULT 0"
+            )
             await conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_referrals_referrer
                 ON referrals (referrer_id)
@@ -726,6 +731,24 @@ class PostgresDB:
                 user_id
             )
         return {"total": total or 0, "converted": converted or 0}
+
+    @classmethod
+    async def increment_referee_msg_count(cls, referred_id) -> dict:
+        """
+        Track referee activity. Returns the row's current state if a referral
+        exists (so callers can decide whether to grant the gated signup bonus).
+        Safe no-op for users without a referral.
+        """
+        referred_id = int(referred_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "UPDATE referrals SET referee_msg_count = referee_msg_count + 1 "
+                "WHERE referred_id = $1 "
+                "RETURNING referrer_id, referee_msg_count, signup_bonus_granted",
+                referred_id
+            )
+            return dict(row) if row else None
 
     @classmethod
     async def add_purchased_credits(cls, user_id, amount: int):

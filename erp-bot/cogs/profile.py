@@ -206,26 +206,37 @@ class ProfileCog(commands.Cog):
         if quota_value:
             embed.add_field(name="⏳ Daily Quota", value=quota_value, inline=False)
 
-        # Streak display (live + best ever)
+        # Streak display — always shown so users discover the system.
         if streak_info is not None:
             streak = streak_info.get("streak", 0)
             best = streak_info.get("max", 0)
             active = streak_info.get("active", False)
-            if streak >= 1:
-                fire = "🔥" * min(streak // 7 + 1, 5) if active else "💤"
-                streak_text = (
-                    f"{fire} Current: **{streak} day{'s' if streak != 1 else ''}**"
-                    + (f"  ·  Best: **{best}**" if best > streak else "")
-                )
-                if active and streak < 30:
+
+            if streak >= 1 and active:
+                fire = "🔥" * min(streak // 7 + 1, 5)
+                streak_text = f"{fire} Current: **{streak} day{'s' if streak != 1 else ''}**"
+                if best > streak:
+                    streak_text += f"  ·  Best: **{best}**"
+                if streak < 30:
                     next_milestones = [3, 7, 14, 30]
                     next_target = next((n for n in next_milestones if n > streak), None)
                     if next_target:
                         rewards = {3: 3, 7: 10, 14: 20, 30: 50}
-                        streak_text += f"\n*Next reward: +{rewards[next_target]} credits at day {next_target}*"
-                elif active and streak >= 30:
+                        streak_text += f"\n*Next reward: **+{rewards[next_target]} credits** at day {next_target}*"
+                else:
                     streak_text += "\n*+15 credits every 7 days from here on*"
-                embed.add_field(name="🔥 Streak", value=streak_text, inline=False)
+            elif best >= 1:
+                streak_text = (
+                    f"💤 Current: **0 days**  ·  Best ever: **{best}**\n"
+                    f"*Send a message in `/erp` today to start a new streak.*"
+                )
+            else:
+                streak_text = (
+                    "💤 No streak yet.\n"
+                    "*Chat in `/erp` daily to build one — rewards at day **3, 7, 14, 30**.*"
+                )
+
+            embed.add_field(name="🔥 Streak", value=streak_text, inline=False)
 
         desc = profile.get("description")
         embed.add_field(
