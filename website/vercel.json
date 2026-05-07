@@ -1,5 +1,11 @@
 {
+  "cleanUrls": true,
+  "trailingSlash": false,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/$1" }
+    { "source": "/home", "destination": "/index.html" }
+  ],
+  "redirects": [
+    { "source": "/", "destination": "/home", "statusCode": 308 },
+    { "source": "/index", "destination": "/home", "statusCode": 308 }
   ]
 }

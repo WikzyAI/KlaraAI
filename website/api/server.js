@@ -455,8 +455,8 @@ app.post('/api/create-checkout', async (req, res) => {
                 quantity: 1,
             }],
             mode: 'payment',
-            success_url: `${req.headers.origin || 'https://klaraai.vercel.app'}/buy-credits.html?success=true&credits=${credits}`,
-            cancel_url: `${req.headers.origin || 'https://klaraai.vercel.app'}/buy-credits.html?canceled=true`,
+            success_url: `${req.headers.origin || 'https://klaraai.vercel.app'}/buy-credits?success=true&credits=${credits}`,
+            cancel_url: `${req.headers.origin || 'https://klaraai.vercel.app'}/buy-credits?canceled=true`,
             metadata: {
                 discord_id: user.id,
                 username: user.username,

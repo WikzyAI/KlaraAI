@@ -12,10 +12,11 @@ import os
 from utils.db import PostgresDB
 
 
-# Rotating presence — cycles every PRESENCE_INTERVAL seconds. Streaming type
-# is mandatory to keep the purple "Live" dot in Discord. The url must be a
-# valid twitch.tv / youtube.com URL for Discord to render the badge.
-PRESENCE_URL = "https://twitch.tv/klaraai"
+# Rotating presence — cycles every PRESENCE_INTERVAL seconds.
+# We use ActivityType.playing (green dot, no clickable link) instead of
+# streaming because Discord forces streaming activities to show a "Watch"
+# button that always opens a twitch.tv/youtube.com URL (it cannot point to
+# arbitrary sites). Playing keeps the rotating text without a stray link.
 PRESENCE_INTERVAL = 45  # seconds — Discord rate-limits presence updates
 
 PRESENCE_ROTATION = [
@@ -91,25 +92,22 @@ class ERPBot(commands.Bot):
     async def on_ready(self):
         print(f"[OK] Logged in as {self.user} (ID: {self.user.id})")
         # Set an initial presence immediately, then start the rotation loop.
-        await self._set_streaming_presence(next(self._presence_iter))
+        await self._set_presence(next(self._presence_iter))
         if not self.rotate_presence.is_running():
             self.rotate_presence.start()
 
-    async def _set_streaming_presence(self, name: str):
-        # discord.Streaming(name=..., url=...) sets the displayed activity name
-        # to `name`. Avoid passing `details=` — it would override and freeze the
-        # title across rotations.
+    async def _set_presence(self, name: str):
         try:
             await self.change_presence(
                 status=discord.Status.online,
-                activity=discord.Streaming(name=name, url=PRESENCE_URL),
+                activity=discord.Game(name=name),
             )
         except Exception as e:
             print(f"[Presence] change_presence failed: {e}")
 
     @tasks.loop(seconds=PRESENCE_INTERVAL)
     async def rotate_presence(self):
-        await self._set_streaming_presence(next(self._presence_iter))
+        await self._set_presence(next(self._presence_iter))
 
     @rotate_presence.before_loop
     async def _before_rotate_presence(self):

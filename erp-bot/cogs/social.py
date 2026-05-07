@@ -100,7 +100,7 @@ class SocialCog(commands.Cog):
                 label="Buy Credits",
                 style=discord.ButtonStyle.link,
                 emoji="💎",
-                url="https://klaraai.vercel.app/buy-credits.html"
+                url="https://klaraai.vercel.app/buy-credits"
             )
             view.add_item(buy_btn)
 

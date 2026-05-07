@@ -114,7 +114,7 @@ class PremiumCog(commands.Cog):
             label="Buy Credits",
             style=discord.ButtonStyle.link,
             emoji="🛒",
-            url="https://klaraai.vercel.app/buy-credits.html",
+            url="https://klaraai.vercel.app/buy-credits",
             row=1
         )
         view.add_item(buy_btn)
@@ -123,7 +123,7 @@ class PremiumCog(commands.Cog):
             label="View on Website",
             style=discord.ButtonStyle.link,
             emoji="🌐",
-            url="https://klaraai.vercel.app/pricing.html",
+            url="https://klaraai.vercel.app/pricing",
             row=1
         )
         view.add_item(site_btn)
