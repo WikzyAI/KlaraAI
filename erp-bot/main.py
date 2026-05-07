@@ -96,15 +96,13 @@ class ERPBot(commands.Bot):
             self.rotate_presence.start()
 
     async def _set_streaming_presence(self, name: str):
+        # discord.Streaming(name=..., url=...) sets the displayed activity name
+        # to `name`. Avoid passing `details=` — it would override and freeze the
+        # title across rotations.
         try:
             await self.change_presence(
                 status=discord.Status.online,
-                activity=discord.Streaming(
-                    name=name,
-                    url=PRESENCE_URL,
-                    details="Private 18+ ERP companion",
-                    platform="Twitch",
-                ),
+                activity=discord.Streaming(name=name, url=PRESENCE_URL),
             )
         except Exception as e:
             print(f"[Presence] change_presence failed: {e}")
