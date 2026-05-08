@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="45%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- Diamond outer shape -->
+  <polygon points="32,4 60,32 32,60 4,32" fill="url(#grad)"/>
+  <!-- Top facet highlight (gem shine) -->
+  <polygon points="32,4 60,32 4,32" fill="url(#shine)" opacity="0.6"/>
+  <!-- Horizontal facet line -->
+  <line x1="4" y1="32" x2="60" y2="32" stroke="#ffffff" stroke-opacity="0.35" stroke-width="0.8"/>
+  <!-- Vertical facet line (top half) -->
+  <line x1="32" y1="4" x2="32" y2="32" stroke="#ffffff" stroke-opacity="0.25" stroke-width="0.6"/>
+</svg>
