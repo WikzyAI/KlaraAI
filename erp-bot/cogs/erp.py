@@ -391,13 +391,21 @@ class ERPCog(commands.Cog):
                 discord.ButtonStyle.secondary,
                 discord.ButtonStyle.danger,
             ]
-            for idx, (key, char) in enumerate(list(characters.items())[:5]):
+            # Discord caps a single message at 5 rows × 5 buttons = 25 actions.
+            # If a Premium user ever has more than 25 visible characters we
+            # silently skip the overflow — they can still launch via /erp
+            # again or via /character info, and we log it so we know to
+            # eventually replace the buttons with a paginated select menu.
+            visible_items = list(characters.items())
+            if len(visible_items) > 25:
+                print(f"[ERP] Truncating button list from {len(visible_items)} to 25 (Discord limit)")
+            for idx, (key, char) in enumerate(visible_items[:25]):
                 emoji = char_emojis[idx % len(char_emojis)]
                 btn = discord.ui.Button(
-                    label=char['name'],
+                    label=char['name'][:80],  # Discord button label cap
                     style=button_styles[idx % len(button_styles)],
                     emoji=emoji,
-                    row=idx // 3
+                    row=idx // 5,  # 5 buttons per row, up to 5 rows
                 )
                 btn.callback = lambda i, k=key: self._start_with_character(i, k)
                 view.add_item(btn)
