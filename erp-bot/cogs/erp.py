@@ -360,18 +360,32 @@ class ERPCog(commands.Cog):
         await interaction.response.defer(thinking=True)
         user_id = str(interaction.user.id)
         characters = await self._get_visible_characters(user_id)
+        char_items = list(characters.items())
 
+        if not char_items:
+            embed = discord.Embed(
+                title="🌹 No characters available",
+                description="*Use /erp → Create Character to add one!*",
+                color=discord.Color.from_rgb(232, 67, 147)
+            )
+            await interaction.followup.send(embed=embed)
+            return
+
+        if show_buttons:
+            view = CharacterListView(char_items, self._start_with_character)
+            await interaction.followup.send(embed=view.build_embed(), view=view)
+            return
+
+        # show_buttons=False — used by some code paths to just display the list
+        # without action buttons. Show up to 25 characters in fields, no view.
         embed = discord.Embed(
             title="🌹 Choose Your Companion",
             description="*Each one is waiting for a different kind of night...*",
             color=discord.Color.from_rgb(232, 67, 147)
         )
-
-        char_emojis = ["💋", "🔥", "💜", "🌙", "⚡", "🥀", "🍷", "🖤"]
-
-        for idx, (key, char) in enumerate(characters.items()):
+        for idx, (key, char) in enumerate(char_items[:25]):
             pers = char.get("personality", "N/A")
-            emoji = char_emojis[idx % len(char_emojis)]
+            emoji = CharacterListView.EMOJIS[idx % len(CharacterListView.EMOJIS)]
             is_private = " 🔒" if char.get("creator") else ""
             short_desc = char['desc'][:180] + ("..." if len(char['desc']) > 180 else "")
             embed.add_field(
@@ -379,39 +393,9 @@ class ERPCog(commands.Cog):
                 value=f"{short_desc}\n*— {pers}*",
                 inline=False
             )
-
-        embed.set_footer(text="Click a name below to start instantly")
-
-        if show_buttons:
-            view = discord.ui.View(timeout=300)
-            button_styles = [
-                discord.ButtonStyle.danger,
-                discord.ButtonStyle.success,
-                discord.ButtonStyle.primary,
-                discord.ButtonStyle.secondary,
-                discord.ButtonStyle.danger,
-            ]
-            # Discord caps a single message at 5 rows × 5 buttons = 25 actions.
-            # If a Premium user ever has more than 25 visible characters we
-            # silently skip the overflow — they can still launch via /erp
-            # again or via /character info, and we log it so we know to
-            # eventually replace the buttons with a paginated select menu.
-            visible_items = list(characters.items())
-            if len(visible_items) > 25:
-                print(f"[ERP] Truncating button list from {len(visible_items)} to 25 (Discord limit)")
-            for idx, (key, char) in enumerate(visible_items[:25]):
-                emoji = char_emojis[idx % len(char_emojis)]
-                btn = discord.ui.Button(
-                    label=char['name'][:80],  # Discord button label cap
-                    style=button_styles[idx % len(button_styles)],
-                    emoji=emoji,
-                    row=idx // 5,  # 5 buttons per row, up to 5 rows
-                )
-                btn.callback = lambda i, k=key: self._start_with_character(i, k)
-                view.add_item(btn)
-            await interaction.followup.send(embed=embed, view=view)
-        else:
-            await interaction.followup.send(embed=embed)
+        if len(char_items) > 25:
+            embed.set_footer(text=f"Showing 25 of {len(char_items)} — use /erp to launch a session")
+        await interaction.followup.send(embed=embed)
 
     async def _start_with_character(self, interaction: discord.Interaction, char_key: str):
         await interaction.response.defer(thinking=True)
@@ -646,6 +630,141 @@ class ERPCog(commands.Cog):
         embed.add_field(name="Key", value=f"`{char_key}`", inline=True)
         embed.set_footer(text=f"Click 'Start' in /erp to begin")
         await interaction.followup.send(embed=embed)
+
+
+class CharacterListView(discord.ui.View):
+    """
+    Paginated character picker. Shows PAGE_SIZE characters per page on row 0
+    (one big button per character) and a Prev/Page/Next nav row on row 1.
+
+    Scales to any number of visible characters — no hard cap. Each page only
+    binds PAGE_SIZE picks at a time, so the ◀/▶ navigation is the only way
+    to reach later characters.
+    """
+
+    PAGE_SIZE = 5
+    EMOJIS = ["💋", "🔥", "💜", "🌙", "⚡", "🥀", "🍷", "🖤"]
+    STYLES = [
+        discord.ButtonStyle.danger,
+        discord.ButtonStyle.success,
+        discord.ButtonStyle.primary,
+        discord.ButtonStyle.secondary,
+        discord.ButtonStyle.danger,
+    ]
+
+    def __init__(self, items: list, on_pick, *, timeout: float = 300.0):
+        super().__init__(timeout=timeout)
+        self.items = items  # list of (key, char_dict) tuples
+        self.on_pick = on_pick  # async callable: (interaction, key) -> None
+        self.page = 0
+        self._refresh_components()
+
+    @property
+    def total_pages(self) -> int:
+        return max(1, (len(self.items) + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
+
+    def build_embed(self) -> discord.Embed:
+        start = self.page * self.PAGE_SIZE
+        end = start + self.PAGE_SIZE
+        embed = discord.Embed(
+            title="🌹 Choose Your Companion",
+            description="*Each one is waiting for a different kind of night...*",
+            color=discord.Color.from_rgb(232, 67, 147)
+        )
+        for offset, (key, char) in enumerate(self.items[start:end]):
+            global_idx = start + offset
+            emoji = self.EMOJIS[global_idx % len(self.EMOJIS)]
+            pers = char.get("personality", "N/A")
+            is_private = " 🔒" if char.get("creator") else ""
+            desc = (char.get('desc') or '')[:180]
+            if len(char.get('desc') or '') > 180:
+                desc += "..."
+            embed.add_field(
+                name=f"{emoji} {char['name']}{is_private}",
+                value=f"{desc}\n*— {pers}*",
+                inline=False
+            )
+        if self.total_pages > 1:
+            embed.set_footer(
+                text=f"Page {self.page + 1}/{self.total_pages} • {len(self.items)} characters total"
+            )
+        else:
+            embed.set_footer(text="Click a name below to start instantly")
+        return embed
+
+    def _refresh_components(self):
+        self.clear_items()
+        start = self.page * self.PAGE_SIZE
+        page_items = self.items[start:start + self.PAGE_SIZE]
+
+        # Row 0: up to 5 character buttons
+        for offset, (key, char) in enumerate(page_items):
+            global_idx = start + offset
+            btn = discord.ui.Button(
+                label=(char['name'] or 'Unknown')[:80],
+                style=self.STYLES[global_idx % len(self.STYLES)],
+                emoji=self.EMOJIS[global_idx % len(self.EMOJIS)],
+                row=0,
+            )
+            btn.callback = self._make_pick_callback(key)
+            self.add_item(btn)
+
+        # Row 1: Prev / page indicator / Next — only when more than 1 page
+        if self.total_pages > 1:
+            prev_btn = discord.ui.Button(
+                label="Prev",
+                style=discord.ButtonStyle.secondary,
+                emoji="◀",
+                row=1,
+                disabled=self.page == 0,
+            )
+            prev_btn.callback = self._go_prev
+            self.add_item(prev_btn)
+
+            indicator = discord.ui.Button(
+                label=f"{self.page + 1}/{self.total_pages}",
+                style=discord.ButtonStyle.secondary,
+                row=1,
+                disabled=True,
+            )
+            self.add_item(indicator)
+
+            next_btn = discord.ui.Button(
+                label="Next",
+                style=discord.ButtonStyle.secondary,
+                emoji="▶",
+                row=1,
+                disabled=self.page >= self.total_pages - 1,
+            )
+            next_btn.callback = self._go_next
+            self.add_item(next_btn)
+
+    def _make_pick_callback(self, key: str):
+        async def callback(interaction: discord.Interaction):
+            await self.on_pick(interaction, key)
+        return callback
+
+    async def _go_prev(self, interaction: discord.Interaction):
+        if self.page > 0:
+            self.page -= 1
+            self._refresh_components()
+            await interaction.response.edit_message(embed=self.build_embed(), view=self)
+        else:
+            try:
+                await interaction.response.defer()
+            except Exception:
+                pass
+
+    async def _go_next(self, interaction: discord.Interaction):
+        if self.page < self.total_pages - 1:
+            self.page += 1
+            self._refresh_components()
+            await interaction.response.edit_message(embed=self.build_embed(), view=self)
+        else:
+            try:
+                await interaction.response.defer()
+            except Exception:
+                pass
 
 
 class CharacterCreateModal(discord.ui.Modal):
