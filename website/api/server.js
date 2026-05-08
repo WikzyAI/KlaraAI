@@ -448,15 +448,15 @@ app.post('/api/create-checkout', async (req, res) => {
                     product_data: {
                         name: `KlaraAI - ${pack_name} Pack (${credits} credits)`,
                         description: `${credits} credits for KlaraAI Discord Bot`,
-                        images: ['https://klaraai.me/img/logo.png'],
+                        images: ['https://www.klaraai.me/img/logo.png'],
                     },
                     unit_amount: priceInCents,
                 },
                 quantity: 1,
             }],
             mode: 'payment',
-            success_url: `${req.headers.origin || 'https://klaraai.me'}/buy-credits?success=true&credits=${credits}`,
-            cancel_url: `${req.headers.origin || 'https://klaraai.me'}/buy-credits?canceled=true`,
+            success_url: `${req.headers.origin || 'https://www.klaraai.me'}/buy-credits?success=true&credits=${credits}`,
+            cancel_url: `${req.headers.origin || 'https://www.klaraai.me'}/buy-credits?canceled=true`,
             metadata: {
                 discord_id: user.id,
                 username: user.username,

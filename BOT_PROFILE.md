@@ -57,8 +57,8 @@ Recommended:
 📍 **General Information** → **Terms of Service URL** / **Privacy Policy URL**
 
 Paste these:
-- **Terms of Service URL:** `https://klaraai.me/terms`
-- **Privacy Policy URL:** `https://klaraai.me/privacy`
+- **Terms of Service URL:** `https://www.klaraai.me/terms`
+- **Privacy Policy URL:** `https://www.klaraai.me/privacy`
 
 These are required by Discord for verified bots and most listing sites.
 

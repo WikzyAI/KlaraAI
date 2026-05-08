@@ -27,7 +27,7 @@ L'auto-entrepreneur est volontairement laissé pour la fin — fais-le après to
 4. Configure une signature simple :
    ```
    — KlaraAI Support
-   https://klaraai.me
+   https://www.klaraai.me
    ```
 
 ### Mettre à jour les pages légales
@@ -107,8 +107,8 @@ Toujours sur https://discord.com/developers/applications → ton app
 
 Toujours sur **General Information**, scroll vers le bas :
 
-- **Terms of Service URL** : `https://klaraai.me/terms`
-- **Privacy Policy URL** : `https://klaraai.me/privacy`
+- **Terms of Service URL** : `https://www.klaraai.me/terms`
+- **Privacy Policy URL** : `https://www.klaraai.me/privacy`
 
 ### 3.3 — Privileged Gateway Intents
 
@@ -131,7 +131,7 @@ Toujours **Bot** :
 Onglet **OAuth2** → **Redirects**
 
 Ajoute ces 2 URLs (tu peux les laisser toutes les deux) :
-- `https://klaraai.me`
+- `https://www.klaraai.me`
 - `https://klaraai.vercel.app` (au cas où, tant que l'ancien marche)
 
 Save.
