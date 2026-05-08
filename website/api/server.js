@@ -164,37 +164,43 @@ app.get('/api/health', (req, res) => {
 
 // Get user credits
 app.get('/api/credits', async (req, res) => {
-    const discordId = req.query.discord_id;
-    const authHeader = req.headers.authorization;
+    try {
+        const discordId = req.query.discord_id;
+        const authHeader = req.headers.authorization;
 
-    if (discordId) {
-        const user = getUserFromDB(discordId);
-        return res.json({
-            discord_id: discordId,
-            username: user ? user.username : 'Unknown',
-            credits: user ? user.credits : 0
-        });
-    }
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        const user = await verifyDiscordToken(token);
-        if (!user) {
-            return res.status(401).json({ error: 'Invalid token' });
+        if (discordId) {
+            const user = getUserFromDB(discordId);
+            return res.json({
+                discord_id: discordId,
+                username: user ? user.username : 'Unknown',
+                credits: user ? user.credits : 0
+            });
         }
-        const dbUser = getUserFromDB(user.id);
-        return res.json({
-            discord_id: user.id,
-            username: user.username,
-            credits: dbUser ? dbUser.credits : 0
-        });
-    }
 
-    return res.status(400).json({ error: 'Missing discord_id or Authorization header' });
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            const token = authHeader.substring(7);
+            const user = await verifyDiscordToken(token);
+            if (!user) {
+                return res.status(401).json({ error: 'Invalid token' });
+            }
+            const dbUser = getUserFromDB(user.id);
+            return res.json({
+                discord_id: user.id,
+                username: user.username,
+                credits: dbUser ? dbUser.credits : 0
+            });
+        }
+
+        return res.status(400).json({ error: 'Missing discord_id or Authorization header' });
+    } catch (e) {
+        console.error('[api/credits] Unhandled error:', e && e.stack ? e.stack : e);
+        res.status(500).json({ error: 'internal', message: e && e.message });
+    }
 });
 
 // Add/Deduct credits (called by website after purchase, or by bot for deductions)
 app.post('/api/credits/add', async (req, res) => {
+    try {
     const authHeader = req.headers.authorization;
 
     let discordId, username;
@@ -263,87 +269,101 @@ app.post('/api/credits/add', async (req, res) => {
         pack_name: req.body.pack_name || 'Credits',
         new_balance: data.users[discordId].credits
     });
+    } catch (e) {
+        console.error('[api/credits/add] Unhandled error:', e && e.stack ? e.stack : e);
+        res.status(500).json({ error: 'internal', message: e && e.message });
+    }
 });
 
 // Update user info (called when user logs in)
 app.post('/api/users/update', async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Missing token' });
-    }
-
-    const token = authHeader.substring(7);
-    const user = await verifyDiscordToken(token);
-    if (!user) {
-        return res.status(401).json({ error: 'Invalid token' });
-    }
-
-    const data = readJSONDB();
-    if (!data.users[user.id]) {
-        data.users[user.id] = {
-            credits: 0,
-            username: user.username,
-            discriminator: user.discriminator,
-            avatar: user.avatar,
-            history: [],
-            created_at: new Date().toISOString()
-        };
-    } else {
-        if (data.users[user.id].username !== user.username) {
-            data.users[user.id].username = user.username;
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'Missing token' });
         }
-    }
-    writeJSONDB(data);
 
-    res.json({ success: true, discord_id: user.id });
+        const token = authHeader.substring(7);
+        const user = await verifyDiscordToken(token);
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid token' });
+        }
+
+        const data = readJSONDB();
+        if (!data.users[user.id]) {
+            data.users[user.id] = {
+                credits: 0,
+                username: user.username,
+                discriminator: user.discriminator,
+                avatar: user.avatar,
+                history: [],
+                created_at: new Date().toISOString()
+            };
+        } else {
+            if (data.users[user.id].username !== user.username) {
+                data.users[user.id].username = user.username;
+            }
+        }
+        writeJSONDB(data);
+
+        res.json({ success: true, discord_id: user.id });
+    } catch (e) {
+        console.error('[api/users/update] Unhandled error:', e && e.stack ? e.stack : e);
+        res.status(500).json({ error: 'internal', message: e && e.message });
+    }
 });
 
 // Get full user dashboard: balance, total purchased, recent history
 app.get('/api/user/dashboard', async (req, res) => {
-    const authHeader = req.headers.authorization;
-    let discordId, username;
+    try {
+        const authHeader = req.headers.authorization;
+        let discordId, username;
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        const u = await verifyDiscordToken(token);
-        if (!u) return res.status(401).json({ error: 'Invalid token' });
-        discordId = u.id;
-        username = u.username;
-    } else if (req.query.discord_id) {
-        discordId = String(req.query.discord_id);
-    } else {
-        return res.status(400).json({ error: 'Missing auth or discord_id' });
-    }
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            const token = authHeader.substring(7);
+            const u = await verifyDiscordToken(token);
+            if (!u) return res.status(401).json({ error: 'Invalid token' });
+            discordId = u.id;
+            username = u.username;
+        } else if (req.query.discord_id) {
+            discordId = String(req.query.discord_id);
+        } else {
+            return res.status(400).json({ error: 'Missing auth or discord_id' });
+        }
 
-    const data = readJSONDB();
-    const user = data.users[discordId];
-    if (!user) {
-        return res.json({
+        const data = readJSONDB();
+        const user = data.users[discordId];
+        if (!user) {
+            return res.json({
+                discord_id: discordId,
+                username: username || 'Unknown',
+                credits: 0,
+                total_purchased: 0,
+                history: [],
+                referral_count: 0,
+                referrer_granted: false
+            });
+        }
+        const history = (user.history || [])
+            .filter(h => h && h.amount)
+            .slice(-8)
+            .reverse();
+        const referralCount = Object.values(data.users)
+            .filter(u => u && String(u.referrer_id) === String(discordId)).length;
+
+        res.json({
             discord_id: discordId,
-            username: username || 'Unknown',
-            credits: 0,
-            total_purchased: 0,
-            history: [],
-            referral_count: 0,
-            referrer_granted: false
+            username: user.username || username || 'Unknown',
+            credits: user.credits || 0,
+            total_purchased: user.total_purchased || 0,
+            history,
+            referral_count: referralCount,
+            referrer_granted: !!user.referrer_granted
         });
+    } catch (e) {
+        console.error('[api/user/dashboard] Unhandled error:', e && e.stack ? e.stack : e);
+        res.status(500).json({ error: 'internal', message: e && e.message });
     }
-    const history = (user.history || [])
-        .filter(h => h && h.amount)
-        .slice(-8)
-        .reverse();
-    const referralCount = Object.values(data.users)
-        .filter(u => String(u.referrer_id) === String(discordId)).length;
-
-    res.json({
-        discord_id: discordId,
-        username: user.username || username || 'Unknown',
-        credits: user.credits || 0,
-        total_purchased: user.total_purchased || 0,
-        history,
-        referral_count: referralCount,
-        referrer_granted: !!user.referrer_granted
-    });
 });
 
 // Get leaderboard
@@ -554,6 +574,26 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 });
 
 // ============================================
+// Global error handler — catches anything that escaped a route's try/catch
+// so the client always gets a JSON 500 with a real message instead of the
+// blank Express default.
+// ============================================
+app.use((err, req, res, next) => {
+    console.error('[GlobalError]', req.method, req.path, '-', err && err.stack ? err.stack : err);
+    if (res.headersSent) return next(err);
+    res.status(500).json({ error: 'internal', message: err && err.message });
+});
+
+// Catch unhandled promise rejections / uncaught exceptions so the process
+// doesn't die silently
+process.on('unhandledRejection', (reason) => {
+    console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+    console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+});
+
+// ============================================
 // Start Server
 // ============================================
 initJSONDB();
@@ -562,4 +602,7 @@ app.listen(PORT, () => {
     console.log(`[Server] KlaraAI Credits API running on http://localhost:${PORT}`);
     console.log(`[DB] Using JSON storage at ${JSON_DB}`);
     console.log(`[DM] Bot token ${BOT_TOKEN ? 'configured' : 'NOT configured - DMs will not be sent'}`);
+    console.log(`[Stripe] Secret key ${process.env.STRIPE_SECRET_KEY ? 'configured (' + (process.env.STRIPE_SECRET_KEY.startsWith('sk_live_') ? 'LIVE' : process.env.STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'TEST' : 'unknown') + ')' : 'NOT configured - checkout will fail'}`);
+    console.log(`[Stripe] Webhook secret ${process.env.STRIPE_WEBHOOK_SECRET ? 'configured' : 'NOT configured - webhooks unsigned'}`);
+    console.log(`[API_SECRET] ${process.env.API_SECRET ? 'configured' : "NOT configured - bot can't add/deduct credits"}`);
 });
