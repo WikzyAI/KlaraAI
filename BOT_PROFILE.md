@@ -25,7 +25,7 @@ Pick one — both are tested at ≤ 400 chars.
 ```
 ✦ KlaraAI — Private 18+ ERP companion. Chat in DMs with three default characters or unlimited custom personas. Persistent long-term memory keeps every scene continuous, fully uncensored AI. Send /help to start, /erp to open the menu.
 
-🌐 klaraai.vercel.app · 🔥 Daily streak rewards · 🎟️ /referral
+🌐 klaraai.me · 🔥 Daily streak rewards · 🎟️ /referral
 ```
 *(371 chars)*
 
@@ -33,7 +33,7 @@ Pick one — both are tested at ≤ 400 chars.
 ```
 KlaraAI is a private 18+ erotic-roleplay Discord bot that runs strictly in DMs. Three default companions (Lilith, Isabelle, Chloé) plus unlimited custom characters on Premium. Long-term memory across sessions, uncensored AI responses, daily streak + referral rewards.
 
-Get started: send /help in DM. Site: klaraai.vercel.app
+Get started: send /help in DM. Site: klaraai.me
 ```
 *(395 chars)*
 
@@ -57,8 +57,8 @@ Recommended:
 📍 **General Information** → **Terms of Service URL** / **Privacy Policy URL**
 
 Paste these:
-- **Terms of Service URL:** `https://klaraai.vercel.app/terms`
-- **Privacy Policy URL:** `https://klaraai.vercel.app/privacy`
+- **Terms of Service URL:** `https://klaraai.me/terms`
+- **Privacy Policy URL:** `https://klaraai.me/privacy`
 
 These are required by Discord for verified bots and most listing sites.
 

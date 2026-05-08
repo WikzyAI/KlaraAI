@@ -81,7 +81,7 @@ class ProfileCog(commands.Cog):
                     label="Buy Credits",
                     style=discord.ButtonStyle.link,
                     emoji="💎",
-                    url="https://klaraai.vercel.app/buy-credits",
+                    url="https://klaraai.me/buy-credits",
                     row=1
                 )
                 view.add_item(buy_btn)

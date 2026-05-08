@@ -134,7 +134,7 @@ class GroqClient:
                     "meta-llama/llama-3.2-3b-instruct:free",
                 ],
                 extra_headers={
-                    "HTTP-Referer": "https://klaraai.vercel.app",
+                    "HTTP-Referer": "https://klaraai.me",
                     "X-Title": "KlaraAI",
                 },
             ))

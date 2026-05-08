@@ -47,7 +47,7 @@ class GeneralCog(commands.Cog):
         embed.add_field(
             name="💎 Get More",
             value=(
-                "› Buy credits: [klaraai.vercel.app](https://klaraai.vercel.app/buy-credits)\n"
+                "› Buy credits: [klaraai.me](https://klaraai.me/buy-credits)\n"
                 "› See plans: `/premium`\n"
                 "› Premium unlocks unlimited messages, custom characters, and Long responses"
             ),
