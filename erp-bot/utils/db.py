@@ -63,7 +63,9 @@ class PostgresDB:
                 END $$;
             """)
 
-            # Sessions table
+            # Sessions table — stores both /erp roleplay sessions and /chat
+            # texting sessions, distinguished by session_type. Only one active
+            # session per user at a time, regardless of type.
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
                     user_id BIGINT PRIMARY KEY,
@@ -72,6 +74,11 @@ class PostgresDB:
                     messages JSONB DEFAULT '[]',
                     created_at TIMESTAMP DEFAULT NOW()
                 )
+            """)
+            await conn.execute("""
+                ALTER TABLE sessions
+                    ADD COLUMN IF NOT EXISTS session_type TEXT DEFAULT 'erp',
+                    ADD COLUMN IF NOT EXISTS chat_nsfw BOOL DEFAULT FALSE
             """)
 
             # Characters table
@@ -350,7 +357,8 @@ class PostgresDB:
         pool = cls._pool_get()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT character_key, character_name, messages, created_at "
+                "SELECT character_key, character_name, messages, created_at, "
+                "session_type, chat_nsfw "
                 "FROM sessions WHERE user_id = $1",
                 user_id
             )
@@ -360,6 +368,8 @@ class PostgresDB:
                 "character": row["character_key"],
                 "character_name": row["character_name"],
                 "messages": row["messages"] if isinstance(row["messages"], list) else json.loads(row["messages"]),
+                "session_type": row["session_type"] or "erp",
+                "chat_nsfw": bool(row["chat_nsfw"]),
             }
 
     @classmethod
@@ -368,14 +378,21 @@ class PostgresDB:
         pool = cls._pool_get()
         async with pool.acquire() as conn:
             await conn.execute(
-                "INSERT INTO sessions (user_id, character_key, character_name, messages) "
-                "VALUES ($1, $2, $3, $4) "
+                "INSERT INTO sessions (user_id, character_key, character_name, "
+                "messages, session_type, chat_nsfw) "
+                "VALUES ($1, $2, $3, $4, $5, $6) "
                 "ON CONFLICT (user_id) DO UPDATE SET "
                 "character_key = EXCLUDED.character_key, "
                 "character_name = EXCLUDED.character_name, "
-                "messages = EXCLUDED.messages",
-                user_id, session["character"], session["character_name"],
-                json.dumps(session["messages"])
+                "messages = EXCLUDED.messages, "
+                "session_type = EXCLUDED.session_type, "
+                "chat_nsfw = EXCLUDED.chat_nsfw",
+                user_id,
+                session["character"],
+                session["character_name"],
+                json.dumps(session["messages"]),
+                session.get("session_type", "erp"),
+                bool(session.get("chat_nsfw", False)),
             )
 
     @classmethod

@@ -72,6 +72,7 @@ class ERPBot(commands.Bot):
         await self.add_cog(ERPCog(self))
         await self.add_cog(Characters(self))
         await self.add_cog(SocialCog(self))
+        await self.add_cog(ChatCog(self))
         print("[OK] Cogs loaded")
 
         self.tree.interaction_check = self._global_interaction_check
@@ -158,13 +159,29 @@ class ERPBot(commands.Bot):
         if message.guild is not None:
             return
         print(f"[DEBUG] DM received from {message.author} (ID: {message.author.id}): {message.content[:50]}...")
-        cog = self.get_cog("ERPCog")
-        if cog and hasattr(cog, "handle_dm_message"):
-            print("[DEBUG] ERPCog found, calling handle_dm_message...")
-            handled = await cog.handle_dm_message(message)
-            print(f"[DEBUG] handle_dm_message returned: {handled}")
-            if handled:
-                return
+
+        # Try chat first (handles its own session check, returns False if
+        # the user has no active /chat session — letting ERP take a shot).
+        chat_cog = self.get_cog("ChatCog")
+        if chat_cog and hasattr(chat_cog, "handle_dm_message"):
+            try:
+                if await chat_cog.handle_dm_message(message):
+                    return
+            except Exception as e:
+                print(f"[ERROR] ChatCog.handle_dm_message: {e}")
+                traceback.print_exc()
+
+        # Fall through to ERP (existing behaviour)
+        erp_cog = self.get_cog("ERPCog")
+        if erp_cog and hasattr(erp_cog, "handle_dm_message"):
+            try:
+                handled = await erp_cog.handle_dm_message(message)
+                print(f"[DEBUG] ERPCog.handle_dm_message returned: {handled}")
+                if handled:
+                    return
+            except Exception as e:
+                print(f"[ERROR] ERPCog.handle_dm_message: {e}")
+                traceback.print_exc()
         else:
             print(f"[DEBUG] ERPCog not found! Available cogs: {list(self.cogs.keys())}")
 
@@ -181,6 +198,7 @@ from cogs.premium import PremiumCog
 from cogs.erp import ERPCog
 from cogs.characters import Characters
 from cogs.social import SocialCog
+from cogs.chat import ChatCog
 
 
 if __name__ == "__main__":

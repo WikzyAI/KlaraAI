@@ -106,6 +106,13 @@ class ERPCog(commands.Cog):
             print(f"[DEBUG ERP] Session None for {user_id}")
             return False
 
+        # If the active session is a /chat session, this cog should not handle
+        # it — the chat cog dispatched first via main.py.on_message and the
+        # only way we reach here for a chat session is a misrouted call.
+        if session.get("session_type") == "chat":
+            print(f"[DEBUG ERP] Active session is type=chat, not handling here")
+            return False
+
         print(f"[DEBUG ERP] Active session found: {session.get('character_name', 'Unknown')}")
 
         if message.content.startswith("/"):
