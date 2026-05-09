@@ -18,6 +18,7 @@ Order of operation per generate() call:
 The class is still named GroqClient for backwards-compat with imports.
 """
 import os
+import re
 import httpx
 from httpx import HTTPStatusError, RequestError
 
@@ -25,6 +26,35 @@ try:
     from config import REFUSAL_PATTERNS
 except ImportError:
     REFUSAL_PATTERNS = []
+
+
+# Reasoning models (Qwen3, DeepSeek-R1, GPT-OSS reasoning variants, etc.)
+# wrap their internal chain-of-thought in <think>...</think> tags before the
+# final answer. We strip those out so the user only sees the in-character
+# response. Also removes the rarer <thinking>...</thinking> variant and any
+# similarly-named "reasoning" / "scratchpad" wrappers that some finetunes use.
+_THINK_BLOCK_RE = re.compile(
+    r"<\s*(think|thinking|reasoning|scratchpad|reflection)\s*>.*?</\s*\1\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+# Also catch an unclosed opening tag — some models leak the opener but not
+# the closer if they hit max_tokens mid-thought.
+_THINK_OPEN_ONLY_RE = re.compile(
+    r"<\s*(think|thinking|reasoning|scratchpad|reflection)\s*>.*",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _strip_thinking(text: str) -> str:
+    """Remove chain-of-thought blocks from a model response."""
+    if not text:
+        return text
+    cleaned = _THINK_BLOCK_RE.sub("", text)
+    # If the model leaked an opener with no matching closer (truncation),
+    # nuke from the opener to the end as a safety net.
+    if re.search(r"<\s*(think|thinking|reasoning|scratchpad|reflection)\s*>", cleaned, re.IGNORECASE):
+        cleaned = _THINK_OPEN_ONLY_RE.sub("", cleaned)
+    return cleaned.strip()
 
 
 # First-stage forcing prefix: a soft commit that gets the model into
@@ -178,7 +208,13 @@ class GroqClient:
             )
             response.raise_for_status()
             data = response.json()
-            return data["choices"][0]["message"]["content"]
+            content = data["choices"][0]["message"]["content"]
+            # Strip <think>...</think> chain-of-thought leaks from reasoning
+            # models (Qwen3, DeepSeek-R1 family, gpt-oss reasoning, etc.)
+            stripped = _strip_thinking(content)
+            if stripped != content:
+                print(f"[LLM] Stripped chain-of-thought block from {model} response")
+            return stripped
 
     async def generate(self, messages: list, temperature: float = 0.95,
                        max_tokens: int = 800) -> str:
