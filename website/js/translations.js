@@ -38,7 +38,17 @@ const translations = {
         dash_referrals: "Parrainages",
         dash_friends_invited: "amis invités",
         dash_rewards_btn: "🎟️ Mon code",
-        dash_recent_activity: "Activité récente",
+                dash_recent_activity: "Activité récente",
+
+        // Trust badges (buy-credits page)
+        trust_ssl: "SSL sécurisé",
+        trust_ssl_desc: "Chiffrement de bout en bout",
+        trust_stripe: "Paiements Stripe",
+        trust_stripe_desc: "Certifié PCI-DSS niveau 1",
+        trust_cancel: "Annulable à tout moment",
+        trust_cancel_desc: "Sans engagement, sans frais",
+        trust_anon: "Anonyme",
+        trust_anon_desc: "Seul ton ID Discord est stocké",
 
         // Character gallery
         chars_title: "Rencontre tes complices",
@@ -273,7 +283,17 @@ const translations = {
         dash_referrals: "Referrals",
         dash_friends_invited: "friends invited",
         dash_rewards_btn: "🎟️ Get my code",
-        dash_recent_activity: "Recent activity",
+                dash_recent_activity: "Recent activity",
+
+        // Trust badges (buy-credits page)
+        trust_ssl: "SSL secured",
+        trust_ssl_desc: "End-to-end encryption",
+        trust_stripe: "Stripe payments",
+        trust_stripe_desc: "PCI-DSS Level 1 certified",
+        trust_cancel: "Cancel anytime",
+        trust_cancel_desc: "No commitment, no fees",
+        trust_anon: "Anonymous",
+        trust_anon_desc: "Only your Discord ID is stored",
 
         // Character gallery
         chars_title: "Meet your companions",

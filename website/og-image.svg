@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- Background gradient: dark indigo to deep violet -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f0820"/>
+      <stop offset="50%" stop-color="#1a0d2e"/>
+      <stop offset="100%" stop-color="#2a1240"/>
+    </linearGradient>
+
+    <!-- Diamond gradient (matches favicon) -->
+    <linearGradient id="diamond" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="50%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+
+    <!-- Pink → violet text gradient for the brand title -->
+    <linearGradient id="brand" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f5f3ff"/>
+      <stop offset="60%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+
+    <!-- Soft glow for the diamond -->
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.45"/>
+      <stop offset="60%" stop-color="#7c3aed" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Decorative radial glows in corners -->
+  <circle cx="180" cy="120" r="280" fill="#ec4899" opacity="0.10"/>
+  <circle cx="1050" cy="510" r="320" fill="#3b82f6" opacity="0.10"/>
+
+  <!-- Glow behind the diamond -->
+  <circle cx="200" cy="315" r="200" fill="url(#glow)"/>
+
+  <!-- Diamond logo (large) -->
+  <g transform="translate(200, 315)">
+    <polygon points="0,-110 110,0 0,110 -110,0" fill="url(#diamond)"/>
+    <polygon points="0,-110 110,0 -110,0" fill="#ffffff" fill-opacity="0.18"/>
+    <line x1="-110" y1="0" x2="110" y2="0" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.5"/>
+    <line x1="0" y1="-110" x2="0" y2="0" stroke="#ffffff" stroke-opacity="0.25" stroke-width="1"/>
+  </g>
+
+  <!-- Brand title -->
+  <text x="380" y="270" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="120" font-weight="900" fill="url(#brand)" letter-spacing="-3">KlaraAI</text>
+
+  <!-- Subtitle -->
+  <text x="380" y="335" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="32" font-weight="500" fill="#a8a3bd" letter-spacing="-0.5">Private 18+ ERP Discord bot</text>
+
+  <!-- Feature pills -->
+  <g transform="translate(380, 380)">
+    <!-- Pill 1: AI -->
+    <rect x="0" y="0" width="170" height="44" rx="22" fill="rgba(236,72,153,0.15)" stroke="rgba(236,72,153,0.4)" stroke-width="1"/>
+    <text x="85" y="29" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600" fill="#f9a8d4" text-anchor="middle">🤖 Uncensored AI</text>
+
+    <!-- Pill 2: Memory -->
+    <rect x="185" y="0" width="180" height="44" rx="22" fill="rgba(168,85,247,0.15)" stroke="rgba(168,85,247,0.4)" stroke-width="1"/>
+    <text x="275" y="29" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600" fill="#d8b4fe" text-anchor="middle">💭 Long-term memory</text>
+
+    <!-- Pill 3: DM only -->
+    <rect x="380" y="0" width="155" height="44" rx="22" fill="rgba(59,130,246,0.15)" stroke="rgba(59,130,246,0.4)" stroke-width="1"/>
+    <text x="457" y="29" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600" fill="#93c5fd" text-anchor="middle">🔒 Strictly DMs</text>
+  </g>
+
+  <!-- Bottom line -->
+  <text x="380" y="500" font-family="Inter, system-ui, sans-serif" font-size="26" font-weight="600" fill="#f5f3ff">3 default companions · Unlimited custom personas</text>
+  <text x="380" y="540" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="500" fill="#7a738f">Daily streak rewards · Referral program</text>
+
+  <!-- URL -->
+  <text x="600" y="595" font-family="'SF Mono', Menlo, Consolas, monospace" font-size="22" font-weight="500" fill="#ec4899" text-anchor="middle">www.klaraai.me</text>
+</svg>

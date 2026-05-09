@@ -2099,6 +2099,67 @@ footer {
     border-color: var(--brand);
 }
 
+/* Trust badges row (buy-credits page) */
+.trust-badges {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.85rem;
+    margin: 0 auto 2.5rem;
+    max-width: 1000px;
+    padding: 0 1rem;
+}
+
+.trust-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.95rem 1.1rem;
+    background: #18102e;
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    transition: border-color 0.2s, transform 0.2s;
+}
+
+[data-theme="light"] .trust-badge {
+    background: #ffffff;
+    border-color: rgba(26, 21, 48, 0.08);
+}
+
+.trust-badge:hover {
+    border-color: var(--brand);
+    transform: translateY(-2px);
+}
+
+.trust-icon {
+    font-size: 1.6rem;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(236, 72, 153, 0.12);
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.trust-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    line-height: 1.3;
+}
+
+.trust-text strong {
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.trust-text span {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
 /* Credits info pill */
 .credits-info {
     background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(168, 85, 247, 0.08));
