@@ -58,10 +58,15 @@ class AIQueue:
             print("[AIQueue] Worker stopped")
 
     async def enqueue(self, messages: list, temperature: float, max_tokens: int,
-                      user_id: int, sub_type: str) -> str:
+                      user_id: int, sub_type: str,
+                      disable_refusal_retry: bool = False) -> str:
         """
         Enqueue an AI request with priority based on subscription type.
         Returns the generated text.
+
+        :param disable_refusal_retry: forwarded to GroqClient.generate.
+            /chat sets this True (its forcing-prefix retry is narrative,
+            inappropriate for chat replies).
         """
         priority = PRIORITY_MAP.get(sub_type, 3)
 
@@ -77,6 +82,7 @@ class AIQueue:
             "max_tokens": max_tokens,
             "user_id": user_id,
             "sub_type": sub_type,
+            "disable_refusal_retry": disable_refusal_retry,
         })
 
         await self.queue.put(item)
@@ -104,6 +110,7 @@ class AIQueue:
                         item.data["messages"],
                         item.data["temperature"],
                         item.data["max_tokens"],
+                        disable_refusal_retry=item.data.get("disable_refusal_retry", False),
                     )
                     if not item.future.done():
                         item.future.set_result(result)

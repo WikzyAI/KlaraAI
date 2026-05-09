@@ -319,8 +319,14 @@ class ChatCog(commands.Cog):
                 # Lower temperature than ERP (0.75 vs 0.95) — chat needs
                 # coherence over creativity, and high temp made the model
                 # spiral into looped sex-bot lines.
+                # disable_refusal_retry=True because the FORCING_PREFIX is
+                # narrative ("*Her eyes lock onto yours*") — it would derail
+                # a chat conversation. We trust the model's first reply
+                # whatever it is — soft deflections are valid in-character
+                # for chat.
                 ai_response = await erp_cog.ai_queue.enqueue(
-                    messages_payload, 0.75, CHAT_MAX_TOKENS, user_id, sub_type
+                    messages_payload, 0.75, CHAT_MAX_TOKENS, user_id, sub_type,
+                    disable_refusal_retry=True,
                 )
             except Exception as e:
                 print(f"[CHAT] AI request failed: {e}")

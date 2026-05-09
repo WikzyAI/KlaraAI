@@ -223,7 +223,17 @@ class GroqClient:
             return stripped
 
     async def generate(self, messages: list, temperature: float = 0.95,
-                       max_tokens: int = 800) -> str:
+                       max_tokens: int = 800,
+                       disable_refusal_retry: bool = False) -> str:
+        """
+        Generate a response from the first available provider/model.
+
+        :param disable_refusal_retry: If True, the response is returned as-is
+            without checking for refusal patterns or attempting the
+            forcing-prefix retry. Useful for /chat where (a) soft deflections
+            are valid in-character replies, (b) the FORCING_PREFIX is written
+            in narrative roleplay style which would derail a chat conversation.
+        """
         last_error = None
 
         for provider in self.providers:
@@ -235,7 +245,7 @@ class GroqClient:
             while tried < n:
                 model = provider.models[provider.current_index]
                 full_id = f"{provider.name}/{model}"
-                print(f"[LLM] Trying {full_id} (max_tokens={max_tokens})")
+                print(f"[LLM] Trying {full_id} (max_tokens={max_tokens}, retry_disabled={disable_refusal_retry})")
                 try:
                     content = await self._call(provider, model, messages, temperature, max_tokens)
                     print(f"[LLM] Response from {full_id}: {len(content)} chars")
@@ -243,6 +253,10 @@ class GroqClient:
                     # diagnose refusal-detection false positives in logs.
                     preview = content.replace("\n", " ")[:250]
                     print(f"[LLM] >>> {preview!r}")
+
+                    if disable_refusal_retry:
+                        # Caller (e.g. /chat) takes whatever the model gave.
+                        return content
 
                     if _looks_like_refusal(content):
                         # ── Stage 1: soft forcing prefix ──
