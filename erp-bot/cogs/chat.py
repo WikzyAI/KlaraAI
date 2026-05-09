@@ -317,16 +317,12 @@ class ChatCog(commands.Cog):
         async with message.channel.typing():
             try:
                 # Lower temperature than ERP (0.75 vs 0.95) — chat needs
-                # coherence over creativity, and high temp made the model
-                # spiral into looped sex-bot lines.
-                # disable_refusal_retry=True because the FORCING_PREFIX is
-                # narrative ("*Her eyes lock onto yours*") — it would derail
-                # a chat conversation. We trust the model's first reply
-                # whatever it is — soft deflections are valid in-character
-                # for chat.
+                # coherence over creativity. mode='chat' picks the
+                # text-message forcing prefix ("mmh ", "okay 😏 ") for
+                # refusal retry instead of narrative ("*Her eyes lock...*").
                 ai_response = await erp_cog.ai_queue.enqueue(
                     messages_payload, 0.75, CHAT_MAX_TOKENS, user_id, sub_type,
-                    disable_refusal_retry=True,
+                    mode="chat",
                 )
             except Exception as e:
                 print(f"[CHAT] AI request failed: {e}")
@@ -339,17 +335,29 @@ class ChatCog(commands.Cog):
         if ai_response.startswith("[LLM_FALLBACK]"):
             print(f"[CHAT] All LLM providers failed for user {user_id}. Last user msg: {message.content[:80]!r}")
             await message.channel.send(
-                "⚠️ All AI providers are currently rate-limited or refusing this prompt. "
-                "Try again in 30 seconds, or rephrase your message. "
-                "If this keeps happening, the bot operator should check Render logs."
+                "⚠️ The AI refused this prompt across every available model.\n"
+                "**What to try:**\n"
+                "› Rephrase less explicitly — let the conversation build up first\n"
+                "› Switch to `/chat` → another persona (some are more open)\n"
+                "› Use `/erp` instead — narrative roleplay tends to bypass refusals better\n"
+                "› *(For the operator: top up OpenRouter ($5+) for Mythomax/Lumimaid which are designed for adult chat — Groq's free models are heavily aligned and will refuse a lot)*"
             )
             return True
 
-        # Strip residual asterisks the model sometimes adds anyway, since
-        # chat shouldn't have any narration.
+        # Strip residual asterisks the model sometimes adds anyway.
         ai_response = self._strip_chat_narration(ai_response)
-        if not ai_response:
-            ai_response = "..."
+
+        # If nothing meaningful is left after strip (model only returned
+        # narration like *she blushes* — common when it's torn between
+        # refusing and engaging), treat as a soft failure with a clearer
+        # signal than a lonely "..."
+        if not ai_response or ai_response in (".", "..", "...", "…"):
+            print(f"[CHAT] Empty/dots response after strip for user {user_id}. Last user msg: {message.content[:80]!r}")
+            await message.channel.send(
+                "⚠️ The AI hesitated and didn't reply meaningfully. "
+                "Try rephrasing — the model may be unsure how to respond."
+            )
+            return True
 
         session["messages"].append({"role": "assistant", "content": ai_response})
         await PostgresDB.set_session(user_id, session)
