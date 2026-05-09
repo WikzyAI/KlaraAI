@@ -80,7 +80,22 @@ class ERPCog(commands.Cog):
 
     async def handle_dm_message(self, message: discord.Message) -> bool:
         user_id = message.author.id
-        print(f"[DEBUG ERP] handle_dm_message called for {user_id}")
+        content_preview = (message.content or "")[:80]
+        print(f"[DEBUG ERP] handle_dm_message called for {user_id} | content_len={len(message.content or '')} | content={content_preview!r}")
+
+        # Hot diagnostic for the most common silent failure: Message Content
+        # Intent disabled in the Dev Portal (or not granted to the bot). The
+        # message arrives but content is empty → the bot looks dead.
+        if message.content == "" or message.content is None:
+            print(f"[DEBUG ERP] Empty message.content from {user_id} — Message Content Intent likely disabled in Dev Portal")
+            try:
+                await message.channel.send(
+                    "⚠️ I can't read what you wrote — my **Message Content Intent** is off.\n"
+                    "Bot owner needs to: Discord Dev Portal → Bot → enable **Message Content Intent** → save → restart the bot."
+                )
+            except Exception:
+                pass
+            return True
 
         if not await PostgresDB.has_active_session(user_id):
             print(f"[DEBUG ERP] No active session for {user_id}")
