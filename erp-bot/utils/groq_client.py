@@ -135,11 +135,14 @@ class GroqClient:
                     "qwen/qwen3-32b",
                     "openai/gpt-oss-120b",
                     "openai/gpt-oss-20b",
-                    "allam-2-7b",
+                    # allam-2-7b — DISABLED. It's an Arabic-focused model
+                    # and produced garbled French ("If tu veux", "ami(e)",
+                    # "que tu font") for users picking the FR / Auto
+                    # language directive.
+                    # "allam-2-7b",
                     # Meta / Llama family — TEMPORARILY DISABLED.
                     # They ignored the language directive (replied in EN even
-                    # when user picked FR) and gave mediocre ERP output. We'll
-                    # bring them back later if/when nothing else is available.
+                    # when user picked FR) and gave mediocre ERP output.
                     # "meta-llama/llama-4-scout-17b-16e-instruct",
                     # "llama-3.3-70b-versatile",
                     # "llama-3.1-8b-instant",
@@ -202,8 +205,11 @@ class GroqClient:
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                     "top_p": 0.95,
-                    "presence_penalty": 0.3,
-                    "frequency_penalty": 0.3,
+                    # Stronger penalties to fight "model loops on the same
+                    # phrase" symptoms observed on /chat replies (e.g. asking
+                    # "quelle taille de bite" three messages in a row).
+                    "presence_penalty": 0.5,
+                    "frequency_penalty": 0.6,
                 },
             )
             response.raise_for_status()

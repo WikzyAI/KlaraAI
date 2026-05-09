@@ -314,8 +314,11 @@ class ChatCog(commands.Cog):
 
         async with message.channel.typing():
             try:
+                # Lower temperature than ERP (0.75 vs 0.95) — chat needs
+                # coherence over creativity, and high temp made the model
+                # spiral into looped sex-bot lines.
                 ai_response = await erp_cog.ai_queue.enqueue(
-                    messages_payload, 0.85, CHAT_MAX_TOKENS, user_id, sub_type
+                    messages_payload, 0.75, CHAT_MAX_TOKENS, user_id, sub_type
                 )
             except Exception as e:
                 print(f"[CHAT] AI request failed: {e}")
