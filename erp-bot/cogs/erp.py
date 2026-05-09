@@ -186,6 +186,15 @@ class ERPCog(commands.Cog):
                 return
             print(f"[DEBUG ERP] AI response received ({len(ai_response)} chars): {ai_response[:100]}...")
 
+        # Detect the LLM fallback tag — means every provider/model failed.
+        if ai_response.startswith("[LLM_FALLBACK]"):
+            print(f"[DEBUG ERP] All LLM providers failed for user {user_id}")
+            await message.channel.send(
+                "⚠️ All AI providers are currently rate-limited or refusing this prompt. "
+                "Try again in 30 seconds, or rephrase your message."
+            )
+            return True
+
         session["messages"].append({"role": "assistant", "content": ai_response})
         await PostgresDB.set_session(user_id, session)
 

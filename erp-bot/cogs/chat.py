@@ -26,9 +26,11 @@ from utils.api_client import add_credits
 # Chat replies are short — cap output tokens regardless of subscription tier.
 CHAT_MAX_TOKENS = 220
 # How many last messages to keep in the prompt window.
-CHAT_CONTEXT_LIMIT = 30
-# Char-cap on history payload (similar to ERP, but tighter for chat).
-CHAT_MAX_HISTORY_CHARS = 12000
+CHAT_CONTEXT_LIMIT = 25
+# Char-cap on history payload. Combined with the bigger chat system prompt
+# (~5k chars after the recent overhaul), keeping this at 8000 lets us fit
+# easily under the strictest Groq model context limit even with NSFW examples.
+CHAT_MAX_HISTORY_CHARS = 8000
 
 
 class ChatCog(commands.Cog):
@@ -324,6 +326,18 @@ class ChatCog(commands.Cog):
                 print(f"[CHAT] AI request failed: {e}")
                 await message.channel.send("⚠️ The AI is taking too long. Try again in a moment.")
                 return True
+
+        # Detect the LLM fallback tag — means every provider/model failed
+        # or refused. Surface a real error to the user instead of pretending
+        # the persona just hesitated.
+        if ai_response.startswith("[LLM_FALLBACK]"):
+            print(f"[CHAT] All LLM providers failed for user {user_id}. Last user msg: {message.content[:80]!r}")
+            await message.channel.send(
+                "⚠️ All AI providers are currently rate-limited or refusing this prompt. "
+                "Try again in 30 seconds, or rephrase your message. "
+                "If this keeps happening, the bot operator should check Render logs."
+            )
+            return True
 
         # Strip residual asterisks the model sometimes adds anyway, since
         # chat shouldn't have any narration.

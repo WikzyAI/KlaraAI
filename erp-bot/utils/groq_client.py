@@ -239,6 +239,10 @@ class GroqClient:
                 try:
                     content = await self._call(provider, model, messages, temperature, max_tokens)
                     print(f"[LLM] Response from {full_id}: {len(content)} chars")
+                    # Print the actual content (first 250 chars) so we can
+                    # diagnose refusal-detection false positives in logs.
+                    preview = content.replace("\n", " ")[:250]
+                    print(f"[LLM] >>> {preview!r}")
 
                     if _looks_like_refusal(content):
                         # ── Stage 1: soft forcing prefix ──
@@ -301,5 +305,7 @@ class GroqClient:
                     provider.current_index = (provider.current_index + 1) % n
                     tried += 1
 
-        print(f"[LLM] All providers exhausted. Last error: {last_error}")
-        return "*She bites her lip, eyes flickering with frustration.* \"Mmh... give me a moment, sweetheart.\""
+        print(f"[LLM] All providers exhausted. Last error type: {type(last_error).__name__}. Last error: {last_error}")
+        # Tagged fallback so callers can identify it and surface a clearer
+        # message to the user rather than re-rendering the in-character text.
+        return "[LLM_FALLBACK] *She bites her lip, eyes flickering with frustration.* \"Mmh... give me a moment, sweetheart.\""
