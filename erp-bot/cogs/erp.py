@@ -16,6 +16,88 @@ from utils.api_client import add_credits
 from utils.memory_extractor import extract_memories, format_memories_for_prompt
 
 
+# ---------------------------------------------------------------------------
+# Tiny i18n helper for /erp embeds — French is the default (the operator's
+# main audience), English is offered for users who picked language="en" in
+# /settings. Other languages (es/it/de/pt) fall back to French.
+# ---------------------------------------------------------------------------
+_I18N = {
+    "fr": {
+        "manager_title": "✦ Gestionnaire de scène ✦",
+        "manager_desc": "*Entre dans ton salon privé.* Choisis une action ci-dessous.",
+        "active_session": "🔥 Scène en cours",
+        "active_session_value": "**{name}** t'attend...",
+        "no_active_session": "💤 Aucune scène active",
+        "no_active_session_value": "Clique sur **Play** pour commencer une nouvelle scène.",
+        "play_btn": "Play",
+        "end_session_btn": "Terminer",
+        "browse_btn": "Parcourir",
+        "create_char_btn": "Créer un personnage",
+        "footer_plan": "Plan : {plan} • Clique un bouton pour continuer",
+        "scene_starts": "💋 La scène commence avec {name}",
+        "scene_starts_desc": "{desc}\n\n**✨ Écris ton premier message — elle écoute.**",
+        "scene_starts_footer": "Utilise /erp → 'Terminer' pour quitter la scène",
+        "scene_ended_title": "🌙 Scène terminée",
+        "scene_ended_desc": "*Les lumières s'éteignent et **{name}** disparaît...*\n\n💭 Sauvegarde des souvenirs et de la conversation pour la prochaine fois...",
+        "char_picker_title": "🌹 Choisis ta complice",
+        "char_picker_desc": "*Chacune attend pour une nuit différente...*",
+        "char_picker_footer_one_page": "Clique sur un nom pour commencer instantanément",
+        "char_picker_footer_pages": "Page {p}/{tp} • {n} personnages au total",
+        "no_chars": "🌹 Aucun personnage disponible",
+        "no_chars_desc": "*Utilise /erp → Créer un personnage pour en ajouter un !*",
+        "continue_or_fresh_title": "📖 Reprendre ou recommencer ?",
+        "continue_or_fresh_desc": "*Tu as déjà une histoire en cours avec **{name}**.* Que veux-tu faire ?",
+        "continue_btn": "Reprendre ({n} messages)",
+        "fresh_btn": "Recommencer à zéro",
+        "continued_title": "📖 La scène reprend avec {name}",
+        "continued_desc": "*Vous reprenez là où vous vous étiez arrêtés.*\n\n**✨ Continue la scène — elle se souvient de tout.**",
+        "no_active_to_end": "❌ Tu n'as aucune scène active.",
+        "already_in_session": "❌ Tu as déjà une scène en cours. Termine-la d'abord avec /erp → Terminer.",
+        "daily_session_limit": "❌ Limite quotidienne de scènes atteinte ({n}/jour). Réessaye demain ou utilise /premium pour passer à un plan supérieur.",
+    },
+    "en": {
+        "manager_title": "✦ ERP Session Manager ✦",
+        "manager_desc": "*Step into your private playroom.* Pick an action below.",
+        "active_session": "🔥 Active Session",
+        "active_session_value": "**{name}** is waiting for you...",
+        "no_active_session": "💤 No Active Session",
+        "no_active_session_value": "Click **Play** to begin a new scene.",
+        "play_btn": "Play",
+        "end_session_btn": "End Session",
+        "browse_btn": "Browse",
+        "create_char_btn": "Create Character",
+        "footer_plan": "Plan: {plan} • Click any button to continue",
+        "scene_starts": "💋 The scene begins with {name}",
+        "scene_starts_desc": "{desc}\n\n**✨ Write your first message — she's listening.**",
+        "scene_starts_footer": "Use /erp → 'End Session' to leave the scene",
+        "scene_ended_title": "🌙 Scene Ended",
+        "scene_ended_desc": "*The lights dim and **{name}** fades away...*\n\n💭 Saving memories and the conversation for next time...",
+        "char_picker_title": "🌹 Choose Your Companion",
+        "char_picker_desc": "*Each one is waiting for a different kind of night...*",
+        "char_picker_footer_one_page": "Click a name below to start instantly",
+        "char_picker_footer_pages": "Page {p}/{tp} • {n} characters total",
+        "no_chars": "🌹 No characters available",
+        "no_chars_desc": "*Use /erp → Create Character to add one!*",
+        "continue_or_fresh_title": "📖 Continue or restart?",
+        "continue_or_fresh_desc": "*You already have a story going with **{name}**.* What do you want to do?",
+        "continue_btn": "Continue ({n} messages)",
+        "fresh_btn": "Start fresh",
+        "continued_title": "📖 The scene continues with {name}",
+        "continued_desc": "*You pick up right where you left off.*\n\n**✨ Continue the scene — she remembers everything.**",
+        "no_active_to_end": "❌ You have no active scene.",
+        "already_in_session": "❌ You already have a session in progress. End it first via /erp → End Session.",
+        "daily_session_limit": "❌ Daily session limit reached ({n}/day). Try again tomorrow or use /premium to upgrade.",
+    },
+}
+
+
+def _t(lang: str, key: str) -> str:
+    """Return the localized string for `key` in `lang` (fallback FR)."""
+    if lang == "en":
+        return _I18N["en"].get(key, _I18N["fr"].get(key, key))
+    return _I18N["fr"].get(key, key)
+
+
 class ERPCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -309,10 +391,11 @@ class ERPCog(commands.Cog):
 
         has_session = await PostgresDB.has_active_session(interaction.user.id)
         limits = await PostgresDB.get_limits(interaction.user.id)
+        lang = await self._user_lang(interaction.user.id)
 
         embed = discord.Embed(
-            title="✦ ERP Session Manager ✦",
-            description="*Step into your private playroom.* Pick an action below.",
+            title=_t(lang, "manager_title"),
+            description=_t(lang, "manager_desc"),
             color=discord.Color.from_rgb(232, 67, 147)
         )
 
@@ -320,51 +403,95 @@ class ERPCog(commands.Cog):
             session = await PostgresDB.get_session(interaction.user.id)
             char_name = session.get("character_name", "Unknown")
             embed.add_field(
-                name="🔥 Active Session",
-                value=f"**{char_name}** is waiting for you...",
+                name=_t(lang, "active_session"),
+                value=_t(lang, "active_session_value").format(name=char_name),
                 inline=False
             )
         else:
             embed.add_field(
-                name="💤 No Active Session",
-                value="Click **Play** to begin a new scene.",
+                name=_t(lang, "no_active_session"),
+                value=_t(lang, "no_active_session_value"),
                 inline=False
             )
 
-        embed.set_footer(text=f"Plan: {limits['name']} • Click any button to continue")
+        embed.set_footer(text=_t(lang, "footer_plan").format(plan=limits['name']))
 
         view = discord.ui.View(timeout=300)
 
-        # Row 0: primary actions
-        play_btn = discord.ui.Button(
-            label="Play" if not has_session else "Switch",
-            style=discord.ButtonStyle.success,
-            emoji="🎭",
-            row=0
-        )
-        play_btn.callback = lambda i: self._button_start(i)
-        view.add_item(play_btn)
-
-        if has_session:
-            end_btn = discord.ui.Button(label="End Session", style=discord.ButtonStyle.danger, emoji="⛔", row=0)
+        # Row 0: primary actions.
+        # When NOT in session: only Play (opens character picker).
+        # When IN session: only End Session (no Play / Switch — Browse is on row 1).
+        if not has_session:
+            play_btn = discord.ui.Button(
+                label=_t(lang, "play_btn"),
+                style=discord.ButtonStyle.success,
+                emoji="🎭",
+                row=0
+            )
+            play_btn.callback = self._open_character_picker
+            view.add_item(play_btn)
+        else:
+            end_btn = discord.ui.Button(
+                label=_t(lang, "end_session_btn"),
+                style=discord.ButtonStyle.danger,
+                emoji="⛔",
+                row=0
+            )
             end_btn.callback = lambda i: self._button_end(i)
             view.add_item(end_btn)
 
-        # Row 1: discovery
-        list_btn = discord.ui.Button(label="Browse", style=discord.ButtonStyle.primary, emoji="🌹", row=1)
-        list_btn.callback = lambda i: self._button_list(i)
+        # Row 1: discovery (always available — also acts as "Switch" when in session)
+        list_btn = discord.ui.Button(
+            label=_t(lang, "browse_btn"),
+            style=discord.ButtonStyle.primary,
+            emoji="🌹",
+            row=1
+        )
+        list_btn.callback = self._open_character_picker
         view.add_item(list_btn)
 
         if limits["custom_chars"] != 0:
-            create_btn = discord.ui.Button(label="Create Character", style=discord.ButtonStyle.primary, emoji="✨", row=1)
+            create_btn = discord.ui.Button(
+                label=_t(lang, "create_char_btn"),
+                style=discord.ButtonStyle.primary,
+                emoji="✨",
+                row=1
+            )
             create_btn.callback = lambda i: self._button_create(i)
             view.add_item(create_btn)
 
         await interaction.followup.send(embed=embed, view=view)
 
-    async def _button_start(self, interaction: discord.Interaction):
-        await interaction.response.defer(thinking=True)
-        await self._erp_list(interaction, show_buttons=True)
+    async def _user_lang(self, user_id) -> str:
+        """Resolve user's language pref to 'fr' or 'en' for embed localization.
+        Defaults to French for any non-English preference (audience is mostly FR)."""
+        try:
+            profile = await PostgresDB.get_profile(user_id)
+            lang = (profile.get("language") or "auto").lower()
+        except Exception:
+            return "fr"
+        return "en" if lang == "en" else "fr"
+
+    async def _open_character_picker(self, interaction: discord.Interaction):
+        """Unified entry point — opens the paginated character picker."""
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=True)
+        user_id = str(interaction.user.id)
+        lang = await self._user_lang(interaction.user.id)
+        characters = await self._get_visible_characters(user_id)
+        char_items = list(characters.items())
+
+        if not char_items:
+            embed = discord.Embed(
+                title=_t(lang, "no_chars"),
+                description=_t(lang, "no_chars_desc"),
+                color=discord.Color.from_rgb(232, 67, 147)
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
+        view = CharacterListView(char_items, self._start_with_character, lang=lang)
+        await interaction.followup.send(embed=view.build_embed(), view=view)
 
     async def _button_end(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
@@ -380,49 +507,9 @@ class ERPCog(commands.Cog):
         all_chars = await PostgresDB.get_all_characters()
         return {k: v for k, v in all_chars.items() if self._is_character_visible(k, v, user_id)}
 
-    async def _button_list(self, interaction: discord.Interaction, show_buttons: bool = True):
-        await interaction.response.defer(thinking=True)
-        user_id = str(interaction.user.id)
-        characters = await self._get_visible_characters(user_id)
-        char_items = list(characters.items())
-
-        if not char_items:
-            embed = discord.Embed(
-                title="🌹 No characters available",
-                description="*Use /erp → Create Character to add one!*",
-                color=discord.Color.from_rgb(232, 67, 147)
-            )
-            await interaction.followup.send(embed=embed)
-            return
-
-        if show_buttons:
-            view = CharacterListView(char_items, self._start_with_character)
-            await interaction.followup.send(embed=view.build_embed(), view=view)
-            return
-
-        # show_buttons=False — used by some code paths to just display the list
-        # without action buttons. Show up to 25 characters in fields, no view.
-        embed = discord.Embed(
-            title="🌹 Choose Your Companion",
-            description="*Each one is waiting for a different kind of night...*",
-            color=discord.Color.from_rgb(232, 67, 147)
-        )
-        for idx, (key, char) in enumerate(char_items[:25]):
-            pers = char.get("personality", "N/A")
-            emoji = CharacterListView.EMOJIS[idx % len(CharacterListView.EMOJIS)]
-            is_private = " 🔒" if char.get("creator") else ""
-            short_desc = char['desc'][:180] + ("..." if len(char['desc']) > 180 else "")
-            embed.add_field(
-                name=f"{emoji} {char['name']}{is_private}",
-                value=f"{short_desc}\n*— {pers}*",
-                inline=False
-            )
-        if len(char_items) > 25:
-            embed.set_footer(text=f"Showing 25 of {len(char_items)} — use /erp to launch a session")
-        await interaction.followup.send(embed=embed)
-
     async def _start_with_character(self, interaction: discord.Interaction, char_key: str):
         await interaction.response.defer(thinking=True)
+        lang = await self._user_lang(interaction.user.id)
         characters = await PostgresDB.get_all_characters()
         if char_key not in characters:
             await interaction.followup.send(f"❌ Character '{char_key}' not found.", ephemeral=True)
@@ -432,7 +519,56 @@ class ERPCog(commands.Cog):
         if creator and str(creator) != str(interaction.user.id):
             await interaction.followup.send("❌ This is a private character. You cannot use it.", ephemeral=True)
             return
-        await self._erp_start(interaction, char_key)
+
+        # Check if there's an archived conversation for this user/character pair.
+        archive = await PostgresDB.get_archived_session(interaction.user.id, char_key)
+        if archive and archive["count"] >= 2:
+            # Offer Continue or Start fresh.
+            embed = discord.Embed(
+                title=_t(lang, "continue_or_fresh_title"),
+                description=_t(lang, "continue_or_fresh_desc").format(name=char["name"]),
+                color=discord.Color.from_rgb(155, 89, 182)
+            )
+            view = discord.ui.View(timeout=300)
+            cont_btn = discord.ui.Button(
+                label=_t(lang, "continue_btn").format(n=archive["count"]),
+                style=discord.ButtonStyle.success,
+                emoji="📖",
+                row=0
+            )
+            cont_btn.callback = self._make_continue_callback(char_key)
+            view.add_item(cont_btn)
+
+            fresh_btn = discord.ui.Button(
+                label=_t(lang, "fresh_btn"),
+                style=discord.ButtonStyle.secondary,
+                emoji="🌱",
+                row=0
+            )
+            fresh_btn.callback = self._make_fresh_callback(char_key)
+            view.add_item(fresh_btn)
+
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+            return
+
+        # No archive → fresh start as before.
+        await self._erp_start(interaction, char_key, resume_messages=None)
+
+    def _make_continue_callback(self, char_key: str):
+        async def _cb(interaction: discord.Interaction):
+            await interaction.response.defer(thinking=True, ephemeral=True)
+            archive = await PostgresDB.get_archived_session(interaction.user.id, char_key)
+            messages = (archive or {}).get("messages") or []
+            await self._erp_start(interaction, char_key, resume_messages=messages)
+            # Keep the archive in case they end and want to continue again later.
+        return _cb
+
+    def _make_fresh_callback(self, char_key: str):
+        async def _cb(interaction: discord.Interaction):
+            await interaction.response.defer(thinking=True, ephemeral=True)
+            await PostgresDB.clear_archived_session(interaction.user.id, char_key)
+            await self._erp_start(interaction, char_key, resume_messages=None)
+        return _cb
 
     async def _button_info(self, interaction: discord.Interaction):
         await interaction.response.send_message(
@@ -464,10 +600,12 @@ class ERPCog(commands.Cog):
         modal = CharacterCreateModal()
         await interaction.response.send_modal(modal)
 
-    async def _erp_start(self, interaction: discord.Interaction, character: str):
+    async def _erp_start(self, interaction: discord.Interaction, character: str,
+                          resume_messages: list | None = None):
+        lang = await self._user_lang(interaction.user.id)
         if not character:
             await interaction.followup.send(
-                "❌ You must specify a character. Use `/erp` and click 'List Characters'.",
+                "❌ You must specify a character.",
                 ephemeral=True
             )
             return
@@ -477,7 +615,7 @@ class ERPCog(commands.Cog):
 
         if char_key not in characters:
             await interaction.followup.send(
-                f"❌ Character '{character}' not found. Use `/erp` and click 'List Characters'.",
+                f"❌ Character '{character}' not found.",
                 ephemeral=True
             )
             return
@@ -490,7 +628,7 @@ class ERPCog(commands.Cog):
 
         if await PostgresDB.has_active_session(interaction.user.id):
             await interaction.followup.send(
-                "❌ You already have a session in progress. Use `/erp` and click 'End' to end it.",
+                _t(lang, "already_in_session"),
                 ephemeral=True
             )
             return
@@ -498,31 +636,42 @@ class ERPCog(commands.Cog):
         if not await PostgresDB.can_start_session(interaction.user.id):
             limits = await PostgresDB.get_limits(interaction.user.id)
             await interaction.followup.send(
-                f"❌ Daily session limit reached ({'unlimited' if limits['daily_sessions'] == -1 else limits['daily_sessions']})/day. "
-                f"Try again tomorrow or use `/premium` to upgrade.",
+                _t(lang, "daily_session_limit").format(
+                    n="unlimited" if limits['daily_sessions'] == -1 else limits['daily_sessions']
+                ),
                 ephemeral=True
             )
             return
 
+        # Resume from archive if requested, otherwise start fresh.
+        msgs = list(resume_messages) if resume_messages else []
         session = {
             "character": char_key,
             "character_name": char["name"],
-            "messages": []
+            "messages": msgs,
         }
         await PostgresDB.set_session(interaction.user.id, session)
         await PostgresDB.increment_sessions(interaction.user.id)
 
-        embed = discord.Embed(
-            title=f"💋 The scene begins with {char['name']}",
-            description=f"{char['desc']}\n\n**✨ Write your first message — she's listening.**",
-            color=discord.Color.from_rgb(232, 67, 147)
-        )
-        embed.set_footer(text="Use /erp → 'End Session' to leave the scene")
+        if resume_messages:
+            embed = discord.Embed(
+                title=_t(lang, "continued_title").format(name=char['name']),
+                description=_t(lang, "continued_desc"),
+                color=discord.Color.from_rgb(155, 89, 182)
+            )
+        else:
+            embed = discord.Embed(
+                title=_t(lang, "scene_starts").format(name=char['name']),
+                description=_t(lang, "scene_starts_desc").format(desc=char['desc']),
+                color=discord.Color.from_rgb(232, 67, 147)
+            )
+        embed.set_footer(text=_t(lang, "scene_starts_footer"))
         await interaction.followup.send(embed=embed)
 
     async def _erp_end(self, interaction: discord.Interaction):
+        lang = await self._user_lang(interaction.user.id)
         if not await PostgresDB.has_active_session(interaction.user.id):
-            await interaction.followup.send("❌ You have no active session.", ephemeral=True)
+            await interaction.followup.send(_t(lang, "no_active_to_end"), ephemeral=True)
             return
 
         session = await PostgresDB.get_session(interaction.user.id)
@@ -530,14 +679,19 @@ class ERPCog(commands.Cog):
         char_key = session.get("character")
         msgs = session.get("messages", []) or []
 
+        # Archive the session BEFORE deleting it, so the user can choose to
+        # "Continue" the same conversation next time they pick this character.
+        if char_key and len(msgs) >= 2:
+            try:
+                await PostgresDB.archive_session(interaction.user.id, char_key, msgs)
+            except Exception as e:
+                print(f"[ERP] archive_session failed: {e}")
+
         await PostgresDB.delete_session(interaction.user.id)
 
         embed = discord.Embed(
-            title="🌙 Scene Ended",
-            description=(
-                f"*The lights dim and **{char_name}** fades away...*\n\n"
-                f"💭 Saving memories so she remembers next time..."
-            ),
+            title=_t(lang, "scene_ended_title"),
+            description=_t(lang, "scene_ended_desc").format(name=char_name),
             color=discord.Color.from_rgb(147, 112, 219)
         )
         await interaction.followup.send(embed=embed)
@@ -558,31 +712,6 @@ class ERPCog(commands.Cog):
             print(f"[Memory] Saved {len(items)} memories for user {user_id} / {char_key}")
         except Exception as e:
             print(f"[Memory] Failed to save session memories: {e}")
-
-    async def _erp_list(self, interaction: discord.Interaction):
-        user_id = str(interaction.user.id)
-        characters = await self._get_visible_characters(user_id)
-
-        embed = discord.Embed(
-            title="Available Characters",
-            description="Use to begin.",
-            color=discord.Color.from_rgb(147, 112, 219)
-        )
-
-        if not characters:
-            embed.description = "No characters available. Use to create your own!"
-        else:
-            for key, char in characters.items():
-                pers = char.get("personality", "N/A")
-                is_private = " 🔒" if char.get("creator") else ""
-                embed.add_field(
-                    name=f"{char['name']} ({key}){is_private}",
-                    value=f"{char['desc']}\n*Traits: {pers}*",
-                    inline=False
-                )
-
-        embed.set_footer(text="Use /erp to launch a session, then click 'Start'")
-        await interaction.followup.send(embed=embed)
 
     async def _erp_info(self, interaction: discord.Interaction, character: str):
         if not character:
@@ -676,10 +805,11 @@ class CharacterListView(discord.ui.View):
         discord.ButtonStyle.danger,
     ]
 
-    def __init__(self, items: list, on_pick, *, timeout: float = 300.0):
+    def __init__(self, items: list, on_pick, *, lang: str = "fr", timeout: float = 300.0):
         super().__init__(timeout=timeout)
         self.items = items  # list of (key, char_dict) tuples
         self.on_pick = on_pick  # async callable: (interaction, key) -> None
+        self.lang = lang
         self.page = 0
         self._refresh_components()
 
@@ -691,8 +821,8 @@ class CharacterListView(discord.ui.View):
         start = self.page * self.PAGE_SIZE
         end = start + self.PAGE_SIZE
         embed = discord.Embed(
-            title="🌹 Choose Your Companion",
-            description="*Each one is waiting for a different kind of night...*",
+            title=_t(self.lang, "char_picker_title"),
+            description=_t(self.lang, "char_picker_desc"),
             color=discord.Color.from_rgb(232, 67, 147)
         )
         for offset, (key, char) in enumerate(self.items[start:end]):
@@ -710,10 +840,12 @@ class CharacterListView(discord.ui.View):
             )
         if self.total_pages > 1:
             embed.set_footer(
-                text=f"Page {self.page + 1}/{self.total_pages} • {len(self.items)} characters total"
+                text=_t(self.lang, "char_picker_footer_pages").format(
+                    p=self.page + 1, tp=self.total_pages, n=len(self.items)
+                )
             )
         else:
-            embed.set_footer(text="Click a name below to start instantly")
+            embed.set_footer(text=_t(self.lang, "char_picker_footer_one_page"))
         return embed
 
     def _refresh_components(self):

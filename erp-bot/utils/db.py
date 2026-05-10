@@ -78,6 +78,20 @@ class PostgresDB:
             # no longer reads or writes them. Safe to DROP COLUMN later if
             # you want a clean schema.
 
+            # Archived sessions — when a user ends a scene, we keep the message
+            # history per (user, character) pair so they can choose to "continue
+            # from where they left off" the next time they pick the same
+            # character (instead of always starting fresh).
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS archived_sessions (
+                    user_id BIGINT NOT NULL,
+                    character_key TEXT NOT NULL,
+                    messages JSONB NOT NULL,
+                    ended_at TIMESTAMPTZ DEFAULT NOW(),
+                    PRIMARY KEY (user_id, character_key)
+                )
+            """)
+
             # Characters table
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS characters (
@@ -390,6 +404,55 @@ class PostgresDB:
         pool = cls._pool_get()
         async with pool.acquire() as conn:
             await conn.execute("DELETE FROM sessions WHERE user_id = $1", user_id)
+
+    # ---- Archived session methods (Continue / Start fresh feature) ----
+
+    @classmethod
+    async def archive_session(cls, user_id, character_key: str, messages: list):
+        """Save a session's message history so the user can resume next time."""
+        user_id = int(user_id)
+        if not character_key or not messages:
+            return
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO archived_sessions (user_id, character_key, messages, ended_at) "
+                "VALUES ($1, $2, $3, NOW()) "
+                "ON CONFLICT (user_id, character_key) DO UPDATE SET "
+                "messages = EXCLUDED.messages, ended_at = NOW()",
+                user_id, character_key, json.dumps(messages)
+            )
+
+    @classmethod
+    async def get_archived_session(cls, user_id, character_key: str) -> dict | None:
+        """Returns {messages, ended_at, count} or None if no archive exists."""
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT messages, ended_at FROM archived_sessions "
+                "WHERE user_id = $1 AND character_key = $2",
+                user_id, character_key
+            )
+            if not row:
+                return None
+            messages = row["messages"] if isinstance(row["messages"], list) \
+                else json.loads(row["messages"])
+            return {
+                "messages": messages,
+                "ended_at": row["ended_at"],
+                "count": len(messages),
+            }
+
+    @classmethod
+    async def clear_archived_session(cls, user_id, character_key: str):
+        user_id = int(user_id)
+        pool = cls._pool_get()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM archived_sessions WHERE user_id = $1 AND character_key = $2",
+                user_id, character_key
+            )
 
     @classmethod
     async def has_active_session(cls, user_id) -> bool:
