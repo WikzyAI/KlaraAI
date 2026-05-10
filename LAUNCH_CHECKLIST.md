@@ -20,9 +20,9 @@ L'auto-entrepreneur est volontairement laissé pour la fin — fais-le après to
 
 1. Va sur **[ProtonMail](https://account.proton.me/signup)** ou **[Tutanota](https://app.tuta.com/signup)** (les 2 sont gratuits, chiffrés, sans pub)
 2. Crée un compte avec une adresse pro :
-   - `wikzyai@protonmail.com`
-   - ou `klaraai.support@protonmail.com`
+   - `klaraai.support@protonmail.com`
    - ou `contact.klaraai@proton.me`
+   - ou `support.klaraai@proton.me`
 3. Note le mot de passe quelque part en sécurité (pas dans Discord !)
 4. Configure une signature simple :
    ```
@@ -158,7 +158,7 @@ Aujourd'hui ton bot tourne **sur ton PC**. Quand tu éteins → bot HS → tu pe
 
 1. Va sur **[render.com](https://render.com)** → tu as déjà un compte (l'API tourne dessus)
 2. Clique **+ New** → **Web Service**
-3. Sélectionne le repo **`WikzyAI/KlaraAI`**
+3. Sélectionne ton repo KlaraAI
 4. Render détecte automatiquement le fichier `erp-bot/render.yaml` → il pré-remplit tout
 
 5. **Avant de cliquer "Create"**, va dans l'onglet **Environment** et ajoute ces variables (récupère-les de ton fichier `.env` local) :

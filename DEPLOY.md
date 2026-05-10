@@ -27,7 +27,7 @@ You don't need to write anything new — the work is already done:
 
 1. Go to https://render.com → log in (you already have an account).
 2. **New +** → **Web Service**.
-3. Pick the repo `WikzyAI/KlaraAI` (Render reads `render.yaml` automatically).
+3. Pick the KlaraAI repo (Render reads `render.yaml` automatically).
 4. Render will detect the bot service. Verify the fields:
    - **Root directory:** `erp-bot`
    - **Build command:** `pip install -r requirements.txt`
