@@ -32,11 +32,15 @@ class PremiumCog(commands.Cog):
         sessions_limit = "unlimited" if limits["daily_sessions"] == -1 else limits["daily_sessions"]
 
         sub_emoji = {"free": "🌿", "standard": "💎", "premium": "👑"}.get(sub_type, "✨")
+        is_admin = interaction.user.id in config.ADMIN_USER_IDS
+        plan_label = f"{sub_emoji} **{limits['name']}**"
+        if is_admin:
+            plan_label += "  ·  🛡️ **ADMIN**"
 
         embed = discord.Embed(
             title="👑 Subscription & Credits",
-            description=f"Current plan: {sub_emoji} **{limits['name']}**",
-            color=discord.Color.from_rgb(241, 196, 15)
+            description=f"Current plan: {plan_label}",
+            color=discord.Color.from_rgb(239, 68, 68) if is_admin else discord.Color.from_rgb(241, 196, 15)
         )
 
         embed.add_field(

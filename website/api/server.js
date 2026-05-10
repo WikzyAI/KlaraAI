@@ -492,6 +492,26 @@ app.get('/api/user/dashboard', async (req, res) => {
             return res.status(400).json({ error: 'Missing auth or discord_id' });
         }
 
+        const isAdmin = ADMIN_USER_IDS.has(String(discordId));
+        // sub_type lives in the bot's `profiles` table (same Postgres DB).
+        // We swallow errors — the dashboard must still render if the bot's
+        // schema isn't ready yet.
+        let subType = 'free';
+        try {
+            const numericId = String(discordId).match(/^\d+$/) ? discordId : null;
+            if (numericId) {
+                const { rows: profRows } = await pool.query(
+                    `SELECT sub_type FROM profiles WHERE user_id = $1::bigint LIMIT 1`,
+                    [String(numericId)]
+                );
+                if (profRows[0] && profRows[0].sub_type) {
+                    subType = String(profRows[0].sub_type).toLowerCase();
+                }
+            }
+        } catch (e) {
+            // Bot table may not exist on a fresh DB yet — ignore.
+        }
+
         const user = await getUserDB(discordId);
         if (!user) {
             return res.json({
@@ -502,6 +522,8 @@ app.get('/api/user/dashboard', async (req, res) => {
                 history: [],
                 referral_count: 0,
                 referrer_granted: false,
+                sub_type: subType,
+                is_admin: isAdmin,
             });
         }
         const { rows: hist } = await pool.query(
@@ -521,6 +543,8 @@ app.get('/api/user/dashboard', async (req, res) => {
             history: hist,
             referral_count: referralCount,
             referrer_granted: !!user.referrer_granted,
+            sub_type: subType,
+            is_admin: isAdmin,
         });
     } catch (e) {
         console.error('[api/user/dashboard] error:', e && e.stack || e);

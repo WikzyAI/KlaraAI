@@ -164,9 +164,18 @@ class ProfileCog(commands.Cog):
         sub_emoji = {"free": "🌿", "standard": "💎", "premium": "👑"}.get(sub_type, "✨")
         accent = {"free": 0x95a5a6, "standard": 0x9b59b6, "premium": 0xf1c40f}.get(sub_type, 0x9b59b6)
 
+        # Admins get a red accent + a star prefix in the title — visually
+        # outranks any subscription tier.
+        is_admin = user.id in config.ADMIN_USER_IDS
+        if is_admin:
+            accent = 0xef4444  # red
+            title = f"⭐ {user.name}'s Profile  ·  ADMIN ⭐"
+        else:
+            title = f"✦ {user.name}'s Profile ✦"
+
         if embed is None:
             embed = discord.Embed(
-                title=f"✦ {user.name}'s Profile ✦",
+                title=title,
                 color=accent
             )
 
@@ -185,7 +194,10 @@ class ProfileCog(commands.Cog):
 
         embed.add_field(name="👤 Name", value=profile.get("name") or "*Not set*", inline=True)
         embed.add_field(name="🎂 Age", value=str(profile.get("age")) if profile.get("age") else "*Not set*", inline=True)
-        embed.add_field(name=f"{sub_emoji} Plan", value=f"**{sub_name}**", inline=True)
+        plan_value = f"**{sub_name}**"
+        if is_admin:
+            plan_value += "  ·  🛡️ **ADMIN**"
+        embed.add_field(name=f"{sub_emoji} Plan", value=plan_value, inline=True)
 
         credits_value = credits if credits is not None else 0
         embed.add_field(

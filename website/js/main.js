@@ -273,19 +273,34 @@ async function loadUserDashboard(user) {
     document.getElementById('dash-total-purchased').textContent = (dash.total_purchased || 0).toLocaleString();
     document.getElementById('dash-referrals').textContent = (dash.referral_count || 0);
 
-    // Admin probe — show ADMIN badge + Admin button only if the API recognises
-    // this Discord ID as admin (server-side check via /api/admin/users).
-    try {
-        const adminCheck = await fetch(`${API_BASE}/api/admin/users?page=1&limit=1`, {
-            headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('discord_access_token') || '') }
-        });
-        if (adminCheck.ok) {
-            const badge = document.getElementById('dash-admin-badge');
-            if (badge) badge.style.display = 'inline-block';
-            const adminLink = document.getElementById('dash-admin-link');
-            if (adminLink) adminLink.style.display = 'inline-flex';
+    // Tier badge — STANDARD or PREMIUM right next to the username.
+    // The dashboard endpoint returns sub_type from the bot's profiles table.
+    const tierBadge = document.getElementById('dash-tier-badge');
+    if (tierBadge) {
+        const sub = String(dash.sub_type || 'free').toLowerCase();
+        tierBadge.classList.remove('tier-standard', 'tier-premium');
+        if (sub === 'standard') {
+            tierBadge.textContent = 'STANDARD';
+            tierBadge.classList.add('tier-standard');
+            tierBadge.style.display = 'inline-flex';
+        } else if (sub === 'premium') {
+            tierBadge.textContent = 'PREMIUM';
+            tierBadge.classList.add('tier-premium');
+            tierBadge.style.display = 'inline-flex';
+        } else {
+            tierBadge.textContent = '';
+            tierBadge.style.display = 'none';
         }
-    } catch (e) { /* not admin or network blip — silent */ }
+    }
+
+    // Admin badge + Admin link — server flags is_admin in the dashboard
+    // response (no extra API roundtrip needed).
+    if (dash.is_admin) {
+        const badge = document.getElementById('dash-admin-badge');
+        if (badge) badge.style.display = 'inline-flex';
+        const adminLink = document.getElementById('dash-admin-link');
+        if (adminLink) adminLink.style.display = 'inline-flex';
+    }
 
     const histWrap = document.getElementById('dash-history-wrap');
     const histList = document.getElementById('dash-history-list');
