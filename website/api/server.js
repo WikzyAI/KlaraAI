@@ -102,19 +102,52 @@ async function initSchema() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_credit_history_user ON credit_history (discord_id, timestamp DESC)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_credit_users_referrer ON credit_users (referrer_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_credit_users_updated ON credit_users (updated_at DESC)`);
-    console.log('[DB] Schema ensured (credit_users, credit_history)');
+    // Marker table so one-shot migrations never replay (even if credit_users
+    // is somehow empty on a later boot, we do NOT re-import old JSON data).
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS migration_log (
+            name TEXT PRIMARY KEY,
+            ran_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            note TEXT
+        )
+    `);
+    console.log('[DB] Schema ensured (credit_users, credit_history, migration_log)');
 }
 
 // One-shot migration from credits.json. Runs only if Postgres has zero users
-// AND credits.json exists with at least one user. Never deletes credits.json.
+// AND the migration has never run before AND credits.json exists with at
+// least one user. Never deletes credits.json. Sets a marker so it can never
+// re-run, even if credit_users becomes empty later (which would otherwise
+// risk overwriting new real users with stale data).
+const MIGRATION_NAME = 'credits_json_to_postgres_v1';
 async function maybeMigrateFromJSON() {
+    const { rows: markerRows } = await pool.query(
+        'SELECT 1 FROM migration_log WHERE name = $1',
+        [MIGRATION_NAME]
+    );
+    if (markerRows.length > 0) {
+        console.log('[Migration] marker present → migration already ran, skip');
+        return;
+    }
     const { rows } = await pool.query('SELECT COUNT(*)::int AS c FROM credit_users');
     if ((rows[0] && rows[0].c) > 0) {
-        console.log('[Migration] credit_users already populated → skip JSON migration');
+        // Postgres already has data → record the marker so we never try again.
+        await pool.query(
+            `INSERT INTO migration_log (name, note) VALUES ($1, $2)
+             ON CONFLICT (name) DO NOTHING`,
+            [MIGRATION_NAME, 'skipped: credit_users already populated at first boot']
+        );
+        console.log('[Migration] credit_users already populated → marker set, skip JSON migration');
         return;
     }
     if (!fs.existsSync(JSON_DB)) {
-        console.log('[Migration] no credits.json found → nothing to migrate');
+        // No JSON to import. Still record the marker so we don't keep checking.
+        await pool.query(
+            `INSERT INTO migration_log (name, note) VALUES ($1, $2)
+             ON CONFLICT (name) DO NOTHING`,
+            [MIGRATION_NAME, 'skipped: no credits.json on disk']
+        );
+        console.log('[Migration] no credits.json found → marker set, nothing to migrate');
         return;
     }
     let parsed;
@@ -164,7 +197,14 @@ async function maybeMigrateFromJSON() {
             console.error(`[Migration] failed to migrate user ${id}:`, err.message);
         }
     }
-    console.log(`[Migration] DONE: ${okUsers} users + ${okHistory} history rows imported. credits.json kept on disk for safety.`);
+    // Record the marker so this migration can NEVER re-run, even if
+    // credit_users is wiped or credits.json is altered later.
+    await pool.query(
+        `INSERT INTO migration_log (name, note) VALUES ($1, $2)
+         ON CONFLICT (name) DO NOTHING`,
+        [MIGRATION_NAME, `imported ${okUsers} users + ${okHistory} history rows from credits.json`]
+    );
+    console.log(`[Migration] DONE: ${okUsers} users + ${okHistory} history rows imported. credits.json kept on disk for safety. Marker set → will never re-run.`);
 }
 
 // ============================================
