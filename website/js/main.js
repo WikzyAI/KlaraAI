@@ -273,6 +273,20 @@ async function loadUserDashboard(user) {
     document.getElementById('dash-total-purchased').textContent = (dash.total_purchased || 0).toLocaleString();
     document.getElementById('dash-referrals').textContent = (dash.referral_count || 0);
 
+    // Admin probe — show ADMIN badge + Admin button only if the API recognises
+    // this Discord ID as admin (server-side check via /api/admin/users).
+    try {
+        const adminCheck = await fetch(`${API_BASE}/api/admin/users?page=1&limit=1`, {
+            headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('discord_access_token') || '') }
+        });
+        if (adminCheck.ok) {
+            const badge = document.getElementById('dash-admin-badge');
+            if (badge) badge.style.display = 'inline-block';
+            const adminLink = document.getElementById('dash-admin-link');
+            if (adminLink) adminLink.style.display = 'inline-flex';
+        }
+    } catch (e) { /* not admin or network blip — silent */ }
+
     const histWrap = document.getElementById('dash-history-wrap');
     const histList = document.getElementById('dash-history-list');
     const history = Array.isArray(dash.history) ? dash.history : [];

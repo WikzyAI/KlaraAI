@@ -352,6 +352,41 @@ nav.scrolled {
     letter-spacing: -0.01em;
 }
 
+.dash-admin-badge {
+    display: inline-block;
+    margin-left: 0.55rem;
+    padding: 0.15rem 0.55rem;
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    color: #ffffff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    border-radius: 100px;
+    vertical-align: middle;
+    text-transform: uppercase;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+    animation: adminBadgePulse 2.4s ease-in-out infinite;
+}
+
+@keyframes adminBadgePulse {
+    0%, 100% { box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35); }
+    50% { box-shadow: 0 2px 14px rgba(239, 68, 68, 0.65); }
+}
+
+.btn-admin {
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-admin:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 6px 18px rgba(239, 68, 68, 0.5);
+    transform: translateY(-1px);
+    color: white;
+}
+
 .dash-spacer { flex: 1; }
 
 .dash-stats {
