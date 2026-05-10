@@ -165,6 +165,23 @@ class ERPCog(commands.Cog):
         content_preview = (message.content or "")[:80]
         print(f"[DEBUG ERP] handle_dm_message called for {user_id} | content_len={len(message.content or '')} | content={content_preview!r}")
 
+        # Hard-block banned users from interacting with the bot via DM.
+        try:
+            if await PostgresDB.is_user_banned(user_id):
+                ban = await PostgresDB.get_ban_info(user_id)
+                reason = (ban or {}).get("reason") or "(no reason given)"
+                try:
+                    await message.channel.send(
+                        f"🚫 You are banned from KlaraAI.\n"
+                        f"**Reason:** {reason}\n"
+                        f"Contact `support@klaraai.me` if you believe this is a mistake."
+                    )
+                except Exception:
+                    pass
+                return True  # consume the message, do not process
+        except Exception as e:
+            print(f"[Ban check ERP] failed: {e}")
+
         # Hot diagnostic for the most common silent failure: Message Content
         # Intent disabled in the Dev Portal (or not granted to the bot). The
         # message arrives but content is empty → the bot looks dead.

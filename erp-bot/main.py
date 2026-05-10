@@ -72,6 +72,7 @@ class ERPBot(commands.Bot):
         await self.add_cog(ERPCog(self))
         await self.add_cog(Characters(self))
         await self.add_cog(SocialCog(self))
+        await self.add_cog(AdminCog(self))
         print("[OK] Cogs loaded")
 
         self.tree.interaction_check = self._global_interaction_check
@@ -104,6 +105,21 @@ class ERPBot(commands.Bot):
                 ephemeral=True
             )
             return False
+
+        # Block any banned user from using slash commands.
+        try:
+            if await PostgresDB.is_user_banned(interaction.user.id):
+                ban = await PostgresDB.get_ban_info(interaction.user.id)
+                reason = (ban or {}).get("reason") or "(no reason given)"
+                await interaction.response.send_message(
+                    f"🚫 You are banned from using KlaraAI.\n"
+                    f"**Reason:** {reason}\n\n"
+                    f"If you believe this is a mistake, contact `support@klaraai.me`.",
+                    ephemeral=True
+                )
+                return False
+        except Exception as e:
+            print(f"[Ban check] failed for user {interaction.user.id}: {e}")
         return True
 
     async def on_ready(self):
@@ -185,6 +201,7 @@ from cogs.premium import PremiumCog
 from cogs.erp import ERPCog
 from cogs.characters import Characters
 from cogs.social import SocialCog
+from cogs.admin import AdminCog
 
 
 if __name__ == "__main__":
