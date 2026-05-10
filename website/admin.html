@@ -96,13 +96,16 @@
     <main>
         <!-- Loading state -->
         <div id="loading" class="admin-page">
-            <p style="color: var(--text-muted);">Chargement...</p>
+            <p style="color: var(--text-muted);" id="loading-msg">Chargement...</p>
         </div>
 
         <!-- Access denied (not logged in OR not admin) -->
         <div id="access-denied" class="access-denied" style="display: none;">
             <h1>🔒 Accès refusé</h1>
-            <p>Cette page est réservée aux administrateurs.</p>
+            <p id="access-denied-msg">Cette page est réservée aux administrateurs.</p>
+            <p style="margin-top:1.5rem;">
+                <button class="btn btn-discord btn-sm" onclick="loginWithDiscord()" id="login-from-admin">🔒 Login with Discord</button>
+            </p>
             <p style="margin-top:1rem;"><a href="/home">← Retour à l'accueil</a></p>
         </div>
 
@@ -206,33 +209,62 @@
             return token ? { 'Authorization': 'Bearer ' + token } : {};
         }
 
+        function showAccessDenied(reason) {
+            const loading = document.getElementById('loading');
+            const denied = document.getElementById('access-denied');
+            const msg = document.getElementById('access-denied-msg');
+            if (loading) loading.style.display = 'none';
+            if (denied) denied.style.display = 'block';
+            if (msg && reason) msg.textContent = reason;
+        }
+
+        function showFatalError(err) {
+            const loading = document.getElementById('loading');
+            if (loading) {
+                loading.innerHTML = '<p style="color:#f87171;">⚠️ Erreur : ' +
+                    (err && err.message ? err.message : String(err)) + '</p>' +
+                    '<p style="margin-top:1rem;"><a href="/home" style="color:var(--brand);">← Retour à l\'accueil</a></p>';
+            }
+            console.error('[admin] fatal:', err);
+        }
+
         async function ensureAdmin() {
-            // Wait for main.js Discord login flow to settle
-            const user = getDiscordUser();
-            if (!user) {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('access-denied').style.display = 'block';
+            // Don't depend on main.js globals — read the token directly so the
+            // page still works if main.js fails to load for any reason.
+            const token = (function () {
+                try { return localStorage.getItem('discord_access_token'); }
+                catch (e) { return null; }
+            })();
+            if (!token) {
+                showAccessDenied('Tu n\'es pas connecté. Login avec Discord d\'abord.');
                 return false;
             }
-            // Probe a protected endpoint to verify admin
+            // Probe a protected endpoint to verify admin status server-side.
+            let res;
             try {
-                const res = await fetch(API + '/api/admin/users?page=1&limit=1', {
-                    headers: authHeaders()
+                res = await fetch(API + '/api/admin/users?page=1&limit=1', {
+                    headers: { 'Authorization': 'Bearer ' + token }
                 });
-                if (res.status === 200) {
-                    state.isAdmin = true;
-                    return true;
-                }
-                // 401 or 403 = not admin
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('access-denied').style.display = 'block';
-                return false;
-            } catch (e) {
-                console.error(e);
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('access-denied').style.display = 'block';
+            } catch (netErr) {
+                showFatalError(netErr);
                 return false;
             }
+            if (res.status === 200) {
+                state.isAdmin = true;
+                return true;
+            }
+            if (res.status === 401) {
+                // Token expired or invalid → wipe and ask to re-login.
+                try { localStorage.removeItem('discord_access_token'); } catch (e) {}
+                showAccessDenied('Ta session a expiré. Re-login avec Discord.');
+                return false;
+            }
+            if (res.status === 403) {
+                showAccessDenied('Ce compte Discord n\'est pas administrateur.');
+                return false;
+            }
+            showAccessDenied('Erreur serveur (HTTP ' + res.status + '). Réessaye plus tard.');
+            return false;
         }
 
         async function loadUsers() {
@@ -258,22 +290,30 @@
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:2rem;">Aucun utilisateur trouvé</td></tr>';
                 return;
             }
-            tbody.innerHTML = users.map(u => {
+            tbody.innerHTML = '';
+            users.forEach(u => {
+                const tr = document.createElement('tr');
                 const updated = u.updated_at ? new Date(u.updated_at).toLocaleDateString() : '—';
                 const credits = (u.credits || 0).toLocaleString();
                 const lifetime = (u.total_purchased || 0).toLocaleString();
                 const safeName = (u.username || '').replace(/[<>]/g, '');
-                return `
-                    <tr>
-                        <td class="uid">${u.discord_id}</td>
-                        <td>${safeName}</td>
-                        <td class="credits">${credits}</td>
-                        <td class="lifetime">${lifetime}</td>
-                        <td class="updated" style="color:var(--text-faint); font-size:0.82rem;">${updated}</td>
-                        <td><button class="edit-btn" onclick="openEditModal('${u.discord_id}', ${u.credits || 0}, '${safeName.replace(/'/g, '\\\\\\'')}')">✏️ Modifier</button></td>
-                    </tr>
+
+                tr.innerHTML = `
+                    <td class="uid"></td>
+                    <td class="uname"></td>
+                    <td class="credits">${credits}</td>
+                    <td class="lifetime">${lifetime}</td>
+                    <td class="updated" style="color:var(--text-faint); font-size:0.82rem;">${updated}</td>
+                    <td><button class="edit-btn">✏️ Modifier</button></td>
                 `;
-            }).join('');
+                // Set text content safely (avoids HTML/quote injection)
+                tr.querySelector('.uid').textContent = u.discord_id;
+                tr.querySelector('.uname').textContent = safeName;
+                tr.querySelector('.edit-btn').addEventListener('click', () => {
+                    openEditModal(u.discord_id, u.credits || 0, safeName);
+                });
+                tbody.appendChild(tr);
+            });
         }
 
         function renderPager() {
@@ -393,19 +433,48 @@
             if (e.key === 'Escape') closeEditModal();
         });
 
-        // Bootstrap once DOM + main.js are ready
-        window.addEventListener('load', async () => {
-            // Wait briefly for main.js to finish its Discord auth handling
-            await new Promise(r => setTimeout(r, 400));
+        // Bootstrap — wrapped in try/catch so any error surfaces visibly
+        // instead of leaving the page stuck on "Chargement...".
+        async function bootstrap() {
+            try {
+                // Give main.js a beat to finish handling any #access_token in
+                // the URL hash (when arriving fresh from Discord OAuth).
+                await new Promise(r => setTimeout(r, 350));
 
-            const ok = await ensureAdmin();
-            if (!ok) return;
+                const ok = await ensureAdmin();
+                if (!ok) return;
 
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('admin-panel').style.display = 'block';
-            setupSearch();
-            await loadUsers();
-        });
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('admin-panel').style.display = 'block';
+                setupSearch();
+                await loadUsers();
+            } catch (e) {
+                showFatalError(e);
+            }
+        }
+
+        // Fire on both load (full assets ready) and DOMContentLoaded — if one
+        // is missed for any reason, the other still kicks us off.
+        if (document.readyState === 'complete') {
+            bootstrap();
+        } else {
+            window.addEventListener('load', bootstrap, { once: true });
+        }
+
+        // Fallback inline loginWithDiscord in case main.js didn't load.
+        if (typeof loginWithDiscord !== 'function') {
+            window.loginWithDiscord = function () {
+                try {
+                    localStorage.setItem('discord_post_login_path', '/admin');
+                } catch (e) {}
+                const clientId = '1500196432211349634';
+                const redirect = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+                    ? 'http://localhost:8000' : 'https://klaraai.me';
+                location.href = 'https://discord.com/api/oauth2/authorize?client_id=' + clientId +
+                    '&redirect_uri=' + encodeURIComponent(redirect) +
+                    '&response_type=token&scope=identify';
+            };
+        }
     </script>
 </body>
 </html>
