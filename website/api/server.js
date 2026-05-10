@@ -17,6 +17,16 @@ const PORT = process.env.PORT || 3000;
 const JSON_DB = path.join(__dirname, 'credits.json');
 const BOT_TOKEN = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN || '';
 
+// Comma-separated Discord user IDs that can call /api/admin/* endpoints.
+// Set on Render: ADMIN_USER_IDS=926474936518856775,...
+const ADMIN_USER_IDS = new Set(
+    (process.env.ADMIN_USER_IDS || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => /^\d+$/.test(s))
+);
+console.log('[Admin] Configured admin Discord IDs:', ADMIN_USER_IDS.size);
+
 // Credit pack definitions (price in cents USD)
 const CREDIT_PACKS = {
     'Starter': { credits: 100, price_usd: 100 },      // $1
@@ -431,6 +441,179 @@ function maybeGrantReferralReward(data, referredId, packName) {
     user.referrer_granted = true;
     return { referrerId, amount: REFERRER_PURCHASE_BONUS };
 }
+
+// ============================================
+// Admin Routes — restricted to ADMIN_USER_IDS
+// ============================================
+
+async function requireAdmin(req, res) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ error: 'Missing token' });
+        return null;
+    }
+    const token = authHeader.substring(7);
+    const user = await verifyDiscordToken(token);
+    if (!user) {
+        res.status(401).json({ error: 'Invalid token' });
+        return null;
+    }
+    if (!ADMIN_USER_IDS.has(String(user.id))) {
+        res.status(403).json({ error: 'Forbidden' });
+        return null;
+    }
+    return user;
+}
+
+// GET /api/admin/users?page=1&limit=20&q=search
+// Returns a paginated list of users with their credit balance and quick stats.
+app.get('/api/admin/users', async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 20));
+    const q = (req.query.q || '').toString().trim().toLowerCase();
+
+    const data = readJSONDB();
+    let entries = Object.entries(data.users || {}).map(([id, u]) => ({
+        discord_id: id,
+        username: u.username || 'Unknown',
+        credits: u.credits || 0,
+        total_purchased: u.total_purchased || 0,
+        history_count: Array.isArray(u.history) ? u.history.length : 0,
+        referrer_id: u.referrer_id || null,
+        updated_at: u.updated_at || u.created_at || null,
+    }));
+
+    if (q) {
+        entries = entries.filter(e =>
+            e.discord_id.toLowerCase().includes(q) ||
+            (e.username || '').toLowerCase().includes(q)
+        );
+    }
+
+    // Sort by most recently updated/active (descending), users without
+    // updated_at land at the bottom.
+    entries.sort((a, b) => {
+        if (!a.updated_at && !b.updated_at) return 0;
+        if (!a.updated_at) return 1;
+        if (!b.updated_at) return -1;
+        return new Date(b.updated_at) - new Date(a.updated_at);
+    });
+
+    const total = entries.length;
+    const start = (page - 1) * limit;
+    const slice = entries.slice(start, start + limit);
+
+    res.json({
+        page,
+        limit,
+        total,
+        total_pages: Math.max(1, Math.ceil(total / limit)),
+        users: slice,
+    });
+});
+
+// GET /api/admin/user/:id — full info on one user
+app.get('/api/admin/user/:id', async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    const id = String(req.params.id);
+    const data = readJSONDB();
+    const u = data.users[id];
+    if (!u) return res.status(404).json({ error: 'User not found' });
+    res.json({
+        discord_id: id,
+        username: u.username || 'Unknown',
+        credits: u.credits || 0,
+        total_purchased: u.total_purchased || 0,
+        referrer_id: u.referrer_id || null,
+        referrer_granted: !!u.referrer_granted,
+        created_at: u.created_at || null,
+        updated_at: u.updated_at || null,
+        history: (u.history || []).slice(-50).reverse(),
+    });
+});
+
+// POST /api/admin/credits/set { discord_id, amount }
+// Set the credit balance to an exact value (regardless of current value).
+app.post('/api/admin/credits/set', async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    const targetId = String(req.body.discord_id || '');
+    const newAmount = parseInt(req.body.amount);
+    if (!/^\d+$/.test(targetId)) {
+        return res.status(400).json({ error: 'Invalid discord_id' });
+    }
+    if (isNaN(newAmount) || newAmount < 0) {
+        return res.status(400).json({ error: 'Invalid amount (must be a non-negative integer)' });
+    }
+
+    const data = readJSONDB();
+    if (!data.users[targetId]) {
+        data.users[targetId] = {
+            credits: 0, history: [], created_at: new Date().toISOString()
+        };
+    }
+    const before = data.users[targetId].credits || 0;
+    const delta = newAmount - before;
+    data.users[targetId].credits = newAmount;
+    data.users[targetId].history = data.users[targetId].history || [];
+    data.users[targetId].history.push({
+        type: delta >= 0 ? 'add' : 'deduct',
+        amount: delta,
+        pack_name: `Admin set (${admin.username || admin.id})`,
+        timestamp: new Date().toISOString(),
+    });
+    data.users[targetId].updated_at = new Date().toISOString();
+    writeJSONDB(data);
+
+    console.log(`[ADMIN] ${admin.username} (${admin.id}) set credits of ${targetId} to ${newAmount} (was ${before})`);
+    res.json({
+        success: true,
+        discord_id: targetId,
+        before,
+        after: newAmount,
+        delta,
+    });
+});
+
+// POST /api/admin/credits/grant-self { amount }
+// Convenience: admin grants credits to themselves (uses their own Discord ID
+// from the OAuth token, no ID confusion possible).
+app.post('/api/admin/credits/grant-self', async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    const amount = parseInt(req.body.amount);
+    if (isNaN(amount) || amount === 0) {
+        return res.status(400).json({ error: 'Invalid amount' });
+    }
+    const targetId = String(admin.id);
+    const data = readJSONDB();
+    if (!data.users[targetId]) {
+        data.users[targetId] = {
+            credits: 0, username: admin.username, history: [], created_at: new Date().toISOString()
+        };
+    }
+    data.users[targetId].credits = (data.users[targetId].credits || 0) + amount;
+    data.users[targetId].username = admin.username;
+    data.users[targetId].history = data.users[targetId].history || [];
+    data.users[targetId].history.push({
+        type: amount >= 0 ? 'add' : 'deduct',
+        amount,
+        pack_name: 'Admin self-grant',
+        timestamp: new Date().toISOString(),
+    });
+    data.users[targetId].updated_at = new Date().toISOString();
+    writeJSONDB(data);
+    console.log(`[ADMIN SELF-GRANT] ${admin.username} (${admin.id}) +${amount} (new balance: ${data.users[targetId].credits})`);
+    res.json({
+        success: true,
+        new_balance: data.users[targetId].credits,
+    });
+});
 
 // ============================================
 // Stripe Payment Routes

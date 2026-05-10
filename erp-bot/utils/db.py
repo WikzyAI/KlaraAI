@@ -150,11 +150,7 @@ class PostgresDB:
                     ADD COLUMN IF NOT EXISTS streak_last_day DATE,
                     ADD COLUMN IF NOT EXISTS referral_code TEXT,
                     ADD COLUMN IF NOT EXISTS total_purchased_credits INT DEFAULT 0,
-                    ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'auto',
-                    ADD COLUMN IF NOT EXISTS is_banned BOOL DEFAULT FALSE,
-                    ADD COLUMN IF NOT EXISTS ban_reason TEXT,
-                    ADD COLUMN IF NOT EXISTS banned_at TIMESTAMPTZ,
-                    ADD COLUMN IF NOT EXISTS banned_by BIGINT
+                    ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'auto'
             """)
             await conn.execute("""
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_referral_code
@@ -850,77 +846,3 @@ class PostgresDB:
             )
             return v or 0
 
-    # ---- Ban system (admin tools) ----
-
-    @classmethod
-    async def ban_user(cls, user_id, reason: str, banned_by) -> bool:
-        """Ban a user. Creates the profile if it doesn't exist."""
-        user_id = int(user_id)
-        banned_by = int(banned_by)
-        pool = cls._pool_get()
-        async with pool.acquire() as conn:
-            await conn.execute(
-                "INSERT INTO profiles (user_id, is_banned, ban_reason, banned_at, banned_by) "
-                "VALUES ($1, TRUE, $2, NOW(), $3) "
-                "ON CONFLICT (user_id) DO UPDATE SET "
-                "is_banned = TRUE, ban_reason = EXCLUDED.ban_reason, "
-                "banned_at = NOW(), banned_by = EXCLUDED.banned_by",
-                user_id, (reason or "")[:500], banned_by
-            )
-        # Also drop their active session and archived conversations.
-        async with pool.acquire() as conn:
-            await conn.execute("DELETE FROM sessions WHERE user_id = $1", user_id)
-            await conn.execute("DELETE FROM archived_sessions WHERE user_id = $1", user_id)
-        return True
-
-    @classmethod
-    async def unban_user(cls, user_id) -> bool:
-        user_id = int(user_id)
-        pool = cls._pool_get()
-        async with pool.acquire() as conn:
-            res = await conn.execute(
-                "UPDATE profiles SET is_banned = FALSE, ban_reason = NULL, "
-                "banned_at = NULL, banned_by = NULL WHERE user_id = $1",
-                user_id
-            )
-            return res.endswith(" 1")
-
-    @classmethod
-    async def is_user_banned(cls, user_id) -> bool:
-        user_id = int(user_id)
-        pool = cls._pool_get()
-        async with pool.acquire() as conn:
-            v = await conn.fetchval(
-                "SELECT is_banned FROM profiles WHERE user_id = $1", user_id
-            )
-            return bool(v)
-
-    @classmethod
-    async def get_ban_info(cls, user_id) -> dict | None:
-        user_id = int(user_id)
-        pool = cls._pool_get()
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT is_banned, ban_reason, banned_at, banned_by "
-                "FROM profiles WHERE user_id = $1",
-                user_id
-            )
-        if not row or not row["is_banned"]:
-            return None
-        return {
-            "reason": row["ban_reason"] or "(no reason given)",
-            "banned_at": row["banned_at"],
-            "banned_by": row["banned_by"],
-        }
-
-    @classmethod
-    async def list_banned_users(cls, limit: int = 50) -> list:
-        pool = cls._pool_get()
-        async with pool.acquire() as conn:
-            rows = await conn.fetch(
-                "SELECT user_id, name, ban_reason, banned_at, banned_by "
-                "FROM profiles WHERE is_banned = TRUE "
-                "ORDER BY banned_at DESC LIMIT $1",
-                limit
-            )
-        return [dict(r) for r in rows]

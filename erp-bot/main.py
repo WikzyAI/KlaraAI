@@ -105,21 +105,6 @@ class ERPBot(commands.Bot):
                 ephemeral=True
             )
             return False
-
-        # Block any banned user from using slash commands.
-        try:
-            if await PostgresDB.is_user_banned(interaction.user.id):
-                ban = await PostgresDB.get_ban_info(interaction.user.id)
-                reason = (ban or {}).get("reason") or "(no reason given)"
-                await interaction.response.send_message(
-                    f"🚫 You are banned from using KlaraAI.\n"
-                    f"**Reason:** {reason}\n\n"
-                    f"If you believe this is a mistake, contact `support@klaraai.me`.",
-                    ephemeral=True
-                )
-                return False
-        except Exception as e:
-            print(f"[Ban check] failed for user {interaction.user.id}: {e}")
         return True
 
     async def on_ready(self):

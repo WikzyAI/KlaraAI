@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - KlaraAI</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="theme-color" content="#7c3aed">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .admin-page { padding: calc(var(--nav-height) + 2rem) 1.25rem 4rem; max-width: var(--container); margin: 0 auto; }
+        .admin-page h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 1.5rem; }
+        .admin-tag { display: inline-block; background: linear-gradient(135deg, #ec4899, #a855f7); color: white; padding: 0.2rem 0.7rem; border-radius: 100px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; margin-left: 0.6rem; vertical-align: middle; }
+
+        .self-grant-card { background: linear-gradient(135deg, #1f1340, #18102e); border: 1px solid rgba(236, 72, 153, 0.4); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 2rem; }
+        [data-theme="light"] .self-grant-card { background: linear-gradient(135deg, #ffffff, #fdf2f8); }
+        .self-grant-card h2 { font-size: 1.1rem; margin-bottom: 0.85rem; }
+        .self-grant-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+        .self-grant-buttons .btn { padding: 0.55rem 1rem; font-size: 0.9rem; }
+        .self-grant-custom { display: flex; gap: 0.5rem; margin-top: 0.6rem; align-items: center; }
+        .self-grant-custom input { padding: 0.5rem 0.85rem; border-radius: 10px; border: 1px solid var(--glass-border-strong); background: rgba(0,0,0,0.25); color: var(--text); font-size: 0.9rem; width: 130px; font-family: inherit; }
+        [data-theme="light"] .self-grant-custom input { background: #ffffff; }
+        .self-grant-msg { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.6rem; min-height: 1.2em; }
+        .self-grant-msg.ok { color: #34d399; }
+        .self-grant-msg.err { color: #f87171; }
+
+        .users-card { background: #18102e; border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: 1.5rem; }
+        [data-theme="light"] .users-card { background: #ffffff; border-color: rgba(26, 21, 48, 0.08); }
+        .users-toolbar { display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+        .users-toolbar input { flex: 1; min-width: 200px; padding: 0.6rem 0.95rem; border-radius: 10px; border: 1px solid var(--glass-border-strong); background: rgba(0,0,0,0.2); color: var(--text); font-size: 0.92rem; font-family: inherit; }
+        [data-theme="light"] .users-toolbar input { background: #ffffff; }
+        .users-toolbar select { padding: 0.6rem 0.85rem; border-radius: 10px; border: 1px solid var(--glass-border-strong); background: rgba(0,0,0,0.2); color: var(--text); font-family: inherit; cursor: pointer; }
+        [data-theme="light"] .users-toolbar select { background: #ffffff; }
+
+        .users-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .users-table thead { background: rgba(255, 255, 255, 0.03); }
+        [data-theme="light"] .users-table thead { background: rgba(26, 21, 48, 0.04); }
+        .users-table th { text-align: left; padding: 0.7rem 0.6rem; font-weight: 600; color: var(--text-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .users-table td { padding: 0.7rem 0.6rem; border-top: 1px solid var(--glass-border); vertical-align: middle; }
+        .users-table tr:hover td { background: rgba(236, 72, 153, 0.04); }
+        .users-table .uid { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 0.78rem; color: var(--text-faint); }
+        .users-table .credits { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+        .users-table .lifetime { font-size: 0.82rem; color: var(--text-muted); }
+        .users-table button.edit-btn { padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 8px; background: rgba(236, 72, 153, 0.15); color: #f9a8d4; border: 1px solid rgba(236, 72, 153, 0.4); cursor: pointer; font-family: inherit; transition: all 0.2s; }
+        .users-table button.edit-btn:hover { background: var(--brand); color: white; }
+
+        .pager { display: flex; justify-content: center; align-items: center; gap: 0.6rem; margin-top: 1.25rem; }
+        .pager button { padding: 0.5rem 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border-strong); color: var(--text); cursor: pointer; font-family: inherit; font-size: 0.88rem; }
+        .pager button:hover:not(:disabled) { background: rgba(236, 72, 153, 0.15); border-color: var(--brand); }
+        .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .pager .pager-info { color: var(--text-muted); font-size: 0.85rem; min-width: 100px; text-align: center; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(8, 5, 16, 0.85); z-index: 5000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px); padding: 1rem; }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: linear-gradient(145deg, #1f1340, #18102e); border: 1px solid rgba(236, 72, 153, 0.4); border-radius: var(--radius-xl); padding: 2rem; max-width: 460px; width: 100%; }
+        [data-theme="light"] .modal-box { background: #ffffff; border-color: rgba(26, 21, 48, 0.1); }
+        .modal-box h3 { font-size: 1.2rem; margin-bottom: 0.5rem; }
+        .modal-box .target { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.25rem; }
+        .modal-box label { display: block; margin: 0.7rem 0 0.4rem; color: var(--text-muted); font-size: 0.85rem; font-weight: 500; }
+        .modal-box input[type=number] { width: 100%; padding: 0.7rem 1rem; border-radius: 10px; border: 1px solid var(--glass-border-strong); background: rgba(0,0,0,0.25); color: var(--text); font-size: 0.95rem; font-family: inherit; }
+        [data-theme="light"] .modal-box input[type=number] { background: #ffffff; }
+        .modal-box .actions { display: flex; gap: 0.6rem; margin-top: 1.25rem; justify-content: flex-end; }
+
+        .access-denied { padding: 4rem 1.25rem; text-align: center; color: var(--text-muted); }
+        .access-denied h1 { color: var(--brand); margin-bottom: 0.5rem; }
+        .access-denied a { color: var(--brand); }
+
+        @media (max-width: 700px) {
+            .users-table .lifetime, .users-table .updated { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-left">
+            <a href="/home" class="nav-brand">✦ <span>KlaraAI</span></a>
+        </div>
+        <div class="nav-right">
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="theme-toggle-btn">🌙</button>
+            <div id="discord-auth" class="discord-auth">
+                <button class="btn btn-discord btn-sm" onclick="loginWithDiscord()" id="login-btn">
+                    <span>🔒</span> <span>Login</span>
+                </button>
+            </div>
+            <div id="discord-user" class="discord-user" style="display: none;">
+                <img id="user-avatar" class="user-avatar" src="" alt="Avatar">
+                <span id="user-name" class="user-name"></span>
+                <button class="btn-logout" onclick="logoutDiscord()" title="Logout">✕</button>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <!-- Loading state -->
+        <div id="loading" class="admin-page">
+            <p style="color: var(--text-muted);">Chargement...</p>
+        </div>
+
+        <!-- Access denied (not logged in OR not admin) -->
+        <div id="access-denied" class="access-denied" style="display: none;">
+            <h1>🔒 Accès refusé</h1>
+            <p>Cette page est réservée aux administrateurs.</p>
+            <p style="margin-top:1rem;"><a href="/home">← Retour à l'accueil</a></p>
+        </div>
+
+        <!-- Main admin panel -->
+        <div id="admin-panel" class="admin-page" style="display: none;">
+            <h1>🛠️ Admin Panel <span class="admin-tag">ADMIN</span></h1>
+
+            <!-- Self-grant card -->
+            <div class="self-grant-card">
+                <h2>💎 Te give des credits</h2>
+                <div class="self-grant-buttons">
+                    <button class="btn btn-secondary" onclick="grantSelf(100)">+100</button>
+                    <button class="btn btn-secondary" onclick="grantSelf(500)">+500</button>
+                    <button class="btn btn-secondary" onclick="grantSelf(1000)">+1 000</button>
+                    <button class="btn btn-secondary" onclick="grantSelf(5000)">+5 000</button>
+                    <button class="btn btn-primary" onclick="grantSelf(10000)">+10 000</button>
+                    <button class="btn btn-primary" onclick="grantSelf(100000)">+100 000</button>
+                </div>
+                <div class="self-grant-custom">
+                    <input type="number" id="self-custom-amount" placeholder="Montant custom" min="-100000" max="1000000">
+                    <button class="btn btn-primary" onclick="grantSelfCustom()">Donner</button>
+                </div>
+                <div id="self-grant-msg" class="self-grant-msg"></div>
+            </div>
+
+            <!-- Users table -->
+            <div class="users-card">
+                <h2 style="margin-bottom: 0.85rem;">👥 Tous les utilisateurs</h2>
+                <div class="users-toolbar">
+                    <input type="text" id="search-input" placeholder="Rechercher par ID Discord ou pseudo..." />
+                    <select id="limit-select">
+                        <option value="20">20 par page</option>
+                        <option value="50">50 par page</option>
+                        <option value="100">100 par page</option>
+                    </select>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th>Discord ID</th>
+                                <th>Pseudo</th>
+                                <th>Credits</th>
+                                <th class="lifetime">Lifetime</th>
+                                <th class="updated">Dernière activité</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody">
+                            <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:2rem;">Chargement...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pager">
+                    <button id="pager-first" onclick="changePage(1)">«</button>
+                    <button id="pager-prev" onclick="changePage(state.page - 1)">‹ Préc</button>
+                    <span class="pager-info" id="pager-info">— / —</span>
+                    <button id="pager-next" onclick="changePage(state.page + 1)">Suiv ›</button>
+                    <button id="pager-last" onclick="changePage(state.totalPages)">»</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Edit credits modal -->
+    <div class="modal-overlay" id="edit-modal">
+        <div class="modal-box">
+            <h3>✏️ Modifier les credits</h3>
+            <div class="target" id="edit-target">—</div>
+            <label>Solde actuel</label>
+            <input type="number" id="edit-current" disabled>
+            <label>Nouveau solde</label>
+            <input type="number" id="edit-new" min="0" max="10000000" step="1">
+            <div id="edit-msg" class="self-grant-msg"></div>
+            <div class="actions">
+                <button class="btn btn-secondary btn-sm" onclick="closeEditModal()">Annuler</button>
+                <button class="btn btn-primary btn-sm" onclick="confirmEdit()">Sauvegarder</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? 'http://localhost:3000'
+            : 'https://klaraai.onrender.com';
+
+        const state = {
+            page: 1,
+            limit: 20,
+            totalPages: 1,
+            total: 0,
+            q: '',
+            editingId: null,
+            isAdmin: false,
+        };
+
+        function authHeaders() {
+            const token = localStorage.getItem('discord_access_token');
+            return token ? { 'Authorization': 'Bearer ' + token } : {};
+        }
+
+        async function ensureAdmin() {
+            // Wait for main.js Discord login flow to settle
+            const user = getDiscordUser();
+            if (!user) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('access-denied').style.display = 'block';
+                return false;
+            }
+            // Probe a protected endpoint to verify admin
+            try {
+                const res = await fetch(API + '/api/admin/users?page=1&limit=1', {
+                    headers: authHeaders()
+                });
+                if (res.status === 200) {
+                    state.isAdmin = true;
+                    return true;
+                }
+                // 401 or 403 = not admin
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('access-denied').style.display = 'block';
+                return false;
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('access-denied').style.display = 'block';
+                return false;
+            }
+        }
+
+        async function loadUsers() {
+            const tbody = document.getElementById('users-tbody');
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:2rem;">Chargement...</td></tr>';
+            try {
+                const url = `${API}/api/admin/users?page=${state.page}&limit=${state.limit}&q=${encodeURIComponent(state.q)}`;
+                const res = await fetch(url, { headers: authHeaders() });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                state.total = data.total;
+                state.totalPages = data.total_pages;
+                renderUsers(data.users);
+                renderPager();
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#f87171; padding:2rem;">Erreur: ${e.message}</td></tr>`;
+            }
+        }
+
+        function renderUsers(users) {
+            const tbody = document.getElementById('users-tbody');
+            if (!users.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:2rem;">Aucun utilisateur trouvé</td></tr>';
+                return;
+            }
+            tbody.innerHTML = users.map(u => {
+                const updated = u.updated_at ? new Date(u.updated_at).toLocaleDateString() : '—';
+                const credits = (u.credits || 0).toLocaleString();
+                const lifetime = (u.total_purchased || 0).toLocaleString();
+                const safeName = (u.username || '').replace(/[<>]/g, '');
+                return `
+                    <tr>
+                        <td class="uid">${u.discord_id}</td>
+                        <td>${safeName}</td>
+                        <td class="credits">${credits}</td>
+                        <td class="lifetime">${lifetime}</td>
+                        <td class="updated" style="color:var(--text-faint); font-size:0.82rem;">${updated}</td>
+                        <td><button class="edit-btn" onclick="openEditModal('${u.discord_id}', ${u.credits || 0}, '${safeName.replace(/'/g, '\\\\\\'')}')">✏️ Modifier</button></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderPager() {
+            document.getElementById('pager-info').textContent = `Page ${state.page} / ${state.totalPages} · ${state.total} users`;
+            document.getElementById('pager-first').disabled = state.page <= 1;
+            document.getElementById('pager-prev').disabled = state.page <= 1;
+            document.getElementById('pager-next').disabled = state.page >= state.totalPages;
+            document.getElementById('pager-last').disabled = state.page >= state.totalPages;
+        }
+
+        function changePage(n) {
+            const newPage = Math.max(1, Math.min(state.totalPages, n));
+            if (newPage === state.page) return;
+            state.page = newPage;
+            loadUsers();
+        }
+
+        // Self-grant
+        async function grantSelf(amount) {
+            const msg = document.getElementById('self-grant-msg');
+            msg.textContent = '⏳ Envoi...';
+            msg.className = 'self-grant-msg';
+            try {
+                const res = await fetch(API + '/api/admin/credits/grant-self', {
+                    method: 'POST',
+                    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Erreur');
+                msg.textContent = `✅ +${amount} credits — nouveau solde: ${data.new_balance}`;
+                msg.className = 'self-grant-msg ok';
+                setTimeout(() => loadUsers(), 500);
+            } catch (e) {
+                msg.textContent = '❌ ' + e.message;
+                msg.className = 'self-grant-msg err';
+            }
+        }
+
+        function grantSelfCustom() {
+            const v = parseInt(document.getElementById('self-custom-amount').value);
+            if (isNaN(v) || v === 0) {
+                const msg = document.getElementById('self-grant-msg');
+                msg.textContent = '❌ Montant invalide';
+                msg.className = 'self-grant-msg err';
+                return;
+            }
+            grantSelf(v);
+        }
+
+        // Edit modal
+        function openEditModal(id, current, name) {
+            state.editingId = id;
+            document.getElementById('edit-target').textContent = `${name} · ${id}`;
+            document.getElementById('edit-current').value = current;
+            document.getElementById('edit-new').value = current;
+            document.getElementById('edit-msg').textContent = '';
+            document.getElementById('edit-msg').className = 'self-grant-msg';
+            document.getElementById('edit-modal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.remove('active');
+            state.editingId = null;
+        }
+
+        async function confirmEdit() {
+            const newVal = parseInt(document.getElementById('edit-new').value);
+            const msg = document.getElementById('edit-msg');
+            if (isNaN(newVal) || newVal < 0) {
+                msg.textContent = '❌ Solde invalide';
+                msg.className = 'self-grant-msg err';
+                return;
+            }
+            msg.textContent = '⏳ Envoi...';
+            msg.className = 'self-grant-msg';
+            try {
+                const res = await fetch(API + '/api/admin/credits/set', {
+                    method: 'POST',
+                    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ discord_id: state.editingId, amount: newVal }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Erreur');
+                msg.textContent = `✅ Mis à jour: ${data.before} → ${data.after}`;
+                msg.className = 'self-grant-msg ok';
+                setTimeout(() => { closeEditModal(); loadUsers(); }, 600);
+            } catch (e) {
+                msg.textContent = '❌ ' + e.message;
+                msg.className = 'self-grant-msg err';
+            }
+        }
+
+        // Search debounce
+        let searchTimeout;
+        function setupSearch() {
+            document.getElementById('search-input').addEventListener('input', e => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    state.q = e.target.value.trim();
+                    state.page = 1;
+                    loadUsers();
+                }, 300);
+            });
+            document.getElementById('limit-select').addEventListener('change', e => {
+                state.limit = parseInt(e.target.value);
+                state.page = 1;
+                loadUsers();
+            });
+        }
+
+        // Close modal on overlay click or ESC
+        document.getElementById('edit-modal').addEventListener('click', e => {
+            if (e.target.id === 'edit-modal') closeEditModal();
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeEditModal();
+        });
+
+        // Bootstrap once DOM + main.js are ready
+        window.addEventListener('load', async () => {
+            // Wait briefly for main.js to finish its Discord auth handling
+            await new Promise(r => setTimeout(r, 400));
+
+            const ok = await ensureAdmin();
+            if (!ok) return;
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('admin-panel').style.display = 'block';
+            setupSearch();
+            await loadUsers();
+        });
+    </script>
+</body>
+</html>
