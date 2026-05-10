@@ -21,8 +21,7 @@ class GeneralCog(commands.Cog):
         embed.add_field(
             name="🎭 Main Commands",
             value=(
-                "`/erp` — Narrative roleplay scenes (long, descriptive)\n"
-                "`/chat` — Real-texting style with an AI persona (short, casual)\n"
+                "`/erp` — Open the session menu\n"
                 "`/profile` — Profile, credits & streak\n"
                 "`/settings` — Tune response length & language\n"
                 "`/premium` — Subscriptions & wallet\n"

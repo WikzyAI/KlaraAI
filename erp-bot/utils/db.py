@@ -63,9 +63,7 @@ class PostgresDB:
                 END $$;
             """)
 
-            # Sessions table — stores both /erp roleplay sessions and /chat
-            # texting sessions, distinguished by session_type. Only one active
-            # session per user at a time, regardless of type.
+            # Sessions table — one active /erp session per user.
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
                     user_id BIGINT PRIMARY KEY,
@@ -75,11 +73,10 @@ class PostgresDB:
                     created_at TIMESTAMP DEFAULT NOW()
                 )
             """)
-            await conn.execute("""
-                ALTER TABLE sessions
-                    ADD COLUMN IF NOT EXISTS session_type TEXT DEFAULT 'erp',
-                    ADD COLUMN IF NOT EXISTS chat_nsfw BOOL DEFAULT FALSE
-            """)
+            # Legacy columns from the removed /chat feature — kept here so
+            # existing deployments don't error on SELECT/INSERT, but the code
+            # no longer reads or writes them. Safe to DROP COLUMN later if
+            # you want a clean schema.
 
             # Characters table
             await conn.execute("""
@@ -357,8 +354,7 @@ class PostgresDB:
         pool = cls._pool_get()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT character_key, character_name, messages, created_at, "
-                "session_type, chat_nsfw "
+                "SELECT character_key, character_name, messages, created_at "
                 "FROM sessions WHERE user_id = $1",
                 user_id
             )
@@ -368,8 +364,6 @@ class PostgresDB:
                 "character": row["character_key"],
                 "character_name": row["character_name"],
                 "messages": row["messages"] if isinstance(row["messages"], list) else json.loads(row["messages"]),
-                "session_type": row["session_type"] or "erp",
-                "chat_nsfw": bool(row["chat_nsfw"]),
             }
 
     @classmethod
@@ -378,21 +372,16 @@ class PostgresDB:
         pool = cls._pool_get()
         async with pool.acquire() as conn:
             await conn.execute(
-                "INSERT INTO sessions (user_id, character_key, character_name, "
-                "messages, session_type, chat_nsfw) "
-                "VALUES ($1, $2, $3, $4, $5, $6) "
+                "INSERT INTO sessions (user_id, character_key, character_name, messages) "
+                "VALUES ($1, $2, $3, $4) "
                 "ON CONFLICT (user_id) DO UPDATE SET "
                 "character_key = EXCLUDED.character_key, "
                 "character_name = EXCLUDED.character_name, "
-                "messages = EXCLUDED.messages, "
-                "session_type = EXCLUDED.session_type, "
-                "chat_nsfw = EXCLUDED.chat_nsfw",
+                "messages = EXCLUDED.messages",
                 user_id,
                 session["character"],
                 session["character_name"],
                 json.dumps(session["messages"]),
-                session.get("session_type", "erp"),
-                bool(session.get("chat_nsfw", False)),
             )
 
     @classmethod
