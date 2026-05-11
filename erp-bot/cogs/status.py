@@ -103,19 +103,60 @@ class StatusCog(commands.Cog):
     # Setup
     # ----------------------------------------------------------------
     async def _find_or_create_message(self) -> discord.Message | None:
+        print(f"[Status] SUPPORT_GUILD_ID env value: {config.SUPPORT_GUILD_ID!r}")
         if not config.SUPPORT_GUILD_ID:
             print("[Status] SUPPORT_GUILD_ID not set — skipping status cog")
             return None
 
         guild = self.bot.get_guild(config.SUPPORT_GUILD_ID)
         if guild is None:
-            print(f"[Status] Bot is not in SUPPORT_GUILD_ID={config.SUPPORT_GUILD_ID}")
+            joined = ", ".join(f"{g.name}({g.id})" for g in self.bot.guilds) or "(none)"
+            print(
+                f"[Status] Bot is NOT in guild {config.SUPPORT_GUILD_ID}. "
+                f"Guilds it currently knows: {joined}"
+            )
             return None
+        print(f"[Status] Bot is in guild: {guild.name} ({guild.id})")
 
+        # Match channel tolerantly: exact name first, otherwise any text
+        # channel whose name *contains* "status" (handles "📊-status",
+        # "🟢│status", "bot-status", etc.).
         channel = discord.utils.get(guild.text_channels, name=STATUS_CHANNEL_NAME)
         if channel is None:
-            print(f"[Status] #{STATUS_CHANNEL_NAME} not found in {guild.name}")
+            candidates = [
+                ch for ch in guild.text_channels
+                if "status" in ch.name.lower()
+            ]
+            if candidates:
+                channel = candidates[0]
+                print(
+                    f"[Status] Exact '#{STATUS_CHANNEL_NAME}' not found; "
+                    f"using nearest match: #{channel.name} ({channel.id})"
+                )
+        if channel is None:
+            all_names = ", ".join(f"#{ch.name}" for ch in guild.text_channels)
+            print(
+                f"[Status] No channel containing 'status' found in {guild.name}. "
+                f"Available channels: {all_names}"
+            )
             return None
+        print(f"[Status] Using channel #{channel.name} ({channel.id})")
+
+        # Sanity-check our own permissions in that channel — print which
+        # ones are missing so the operator can fix them from the role page.
+        me = guild.me
+        if me is not None:
+            perms = channel.permissions_for(me)
+            missing = []
+            if not perms.view_channel:    missing.append("View Channel")
+            if not perms.send_messages:   missing.append("Send Messages")
+            if not perms.embed_links:     missing.append("Embed Links")
+            if not perms.read_message_history: missing.append("Read Message History")
+            if missing:
+                print(
+                    f"[Status] WARNING — bot is missing perms in #{channel.name}: "
+                    f"{', '.join(missing)}"
+                )
 
         # 1. Try pinned messages first (cheap, exact).
         try:
