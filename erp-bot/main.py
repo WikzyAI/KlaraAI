@@ -118,12 +118,140 @@ class ERPBot(commands.Bot):
             # the bot is otherwise strictly DM-only for ERP usage.
             if config.SUPPORT_GUILD_ID and interaction.guild.id == config.SUPPORT_GUILD_ID:
                 return True
-            await interaction.response.send_message(
-                "This bot only works in DMs.",
-                ephemeral=True
+
+            # Refuse the interaction in-server, then DM the user with a
+            # tailored explanation of the exact command they tried. The
+            # in-server response is ephemeral (only the caller sees it).
+            cmd_name = (
+                interaction.command.qualified_name
+                if interaction.command is not None
+                else None
             )
+            cmd_label = f"`/{cmd_name}`" if cmd_name else "this command"
+
+            server_reply = (
+                f"🚫 **KlaraAI only works in Direct Messages.**\n\n"
+                f"You tried {cmd_label} in this server.\n"
+                f"📨 I'm sending you a DM right now with how to use {cmd_label} properly."
+            )
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(server_reply, ephemeral=True)
+                else:
+                    await interaction.followup.send(server_reply, ephemeral=True)
+            except Exception as e:
+                print(f"[InteractionCheck] in-server reply failed: {e}")
+
+            # Try to DM the user with a command-specific hint.
+            dm_embed = self._build_dm_redirect_embed(cmd_name, interaction.guild.name)
+            try:
+                await interaction.user.send(embed=dm_embed)
+            except discord.Forbidden:
+                # User has DMs from server members disabled — tell them how
+                # to fix it via the same ephemeral reply we already used.
+                try:
+                    await interaction.followup.send(
+                        "⚠️ I couldn't DM you — your DMs from server members "
+                        "are closed.\n"
+                        "Open **User Settings → Privacy & Safety → Server "
+                        "Privacy Defaults** and enable *Allow direct messages "
+                        "from server members*, then try the command again.",
+                        ephemeral=True,
+                    )
+                except Exception:
+                    pass
+            except Exception as e:
+                print(f"[InteractionCheck] DM redirect failed: {e}")
+
             return False
         return True
+
+    def _build_dm_redirect_embed(self, cmd_name: str | None, guild_name: str) -> discord.Embed:
+        """Build the DM the bot sends after refusing an in-server command.
+
+        The body is tailored to the exact slash command the user tried so the
+        DM feels like a natural continuation of what they were doing, not a
+        generic "go away" notice.
+        """
+        # (label_for_dm, short pitch describing the command)
+        COMMAND_HINTS = {
+            "erp": (
+                "Start an ERP scene",
+                "Pick one of your characters (Lilith, Isabelle, Chloé, or a "
+                "custom one) and dive into a private 18+ scene.",
+            ),
+            "profile": (
+                "View your profile",
+                "Check your credits balance, current plan, daily quota and "
+                "streak — all in one embed.",
+            ),
+            "settings": (
+                "Configure your settings",
+                "Response length, language, and custom character options.",
+            ),
+            "premium": (
+                "Manage your subscription",
+                "Upgrade to Standard or Premium, see your usage and reset "
+                "countdown, or cancel anytime.",
+            ),
+            "help": (
+                "See all commands",
+                "Quick reference for everything KlaraAI can do.",
+            ),
+            "referral": (
+                "Your referral code",
+                "Invite friends and earn bonus credits when they make their "
+                "first purchase.",
+            ),
+            "memories": (
+                "Manage your memories",
+                "Browse, edit or wipe what the bot remembers about you "
+                "across sessions.",
+            ),
+        }
+
+        if cmd_name and cmd_name in COMMAND_HINTS:
+            label, pitch = COMMAND_HINTS[cmd_name]
+            slash = f"/{cmd_name}"
+            embed = discord.Embed(
+                title=f"📨 {slash} — let's continue here in DM",
+                description=(
+                    f"You just tried `{slash}` in **{guild_name}**, but "
+                    f"KlaraAI **only works in Direct Messages** — privacy "
+                    f"and 18+ content stay between you and me.\n\n"
+                    f"**About `{slash}` — {label}**\n"
+                    f"_{pitch}_\n\n"
+                    f"👉 **Type `{slash}` right here in this DM** and I'll "
+                    f"respond normally."
+                ),
+                color=0x9b59b6,
+            )
+        elif cmd_name:
+            slash = f"/{cmd_name}"
+            embed = discord.Embed(
+                title=f"📨 {slash} — let's continue here in DM",
+                description=(
+                    f"You just tried `{slash}` in **{guild_name}**, but "
+                    f"KlaraAI **only works in Direct Messages**.\n\n"
+                    f"👉 **Type `{slash}` right here in this DM** and I'll "
+                    f"respond normally.\n\n"
+                    f"_Type `/help` to see every command._"
+                ),
+                color=0x9b59b6,
+            )
+        else:
+            embed = discord.Embed(
+                title="📨 Let's continue here in DM",
+                description=(
+                    f"You just tried to use KlaraAI in **{guild_name}**, but "
+                    f"the bot **only works in Direct Messages**.\n\n"
+                    f"👉 **Use my commands right here in this DM** — start "
+                    f"with `/help` or `/erp`."
+                ),
+                color=0x9b59b6,
+            )
+        embed.set_footer(text="KlaraAI · DM-only for privacy and 18+ content")
+        return embed
 
     async def on_ready(self):
         print(f"[OK] Logged in as {self.user} (ID: {self.user.id})")
