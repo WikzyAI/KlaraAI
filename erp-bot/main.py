@@ -112,6 +112,19 @@ class ERPBot(commands.Bot):
         print("[OK] Database pool closed")
 
     async def _global_interaction_check(self, interaction: discord.Interaction) -> bool:
+        # Log everything so we can confirm in Render logs that the check is
+        # firing — and that it returns the right verdict for every case.
+        cmd_dbg = (
+            interaction.command.qualified_name
+            if interaction.command is not None
+            else None
+        )
+        print(
+            f"[Check] type={interaction.type!r} cmd={cmd_dbg!r} "
+            f"guild={(interaction.guild.id if interaction.guild else None)!r} "
+            f"user={interaction.user.id}"
+        )
+
         if interaction.guild is None:
             return True  # DMs are always allowed
 
@@ -124,27 +137,37 @@ class ERPBot(commands.Bot):
             and interaction.guild.id == config.SUPPORT_GUILD_ID
         )
         if is_support_guild and interaction.type == discord.InteractionType.component:
+            print("[Check] -> ALLOW (component in support guild)")
             return True
+
+        print(
+            f"[Check] -> REFUSE (cmd in guild, support={is_support_guild!r}, "
+            f"type={interaction.type!r})"
+        )
 
         # From here on: slash command (or any other interaction) in a guild.
         # Refuse + run the command's logic in DM context.
-        cmd_name = (
-            interaction.command.qualified_name
-            if interaction.command is not None
-            else None
-        )
+        cmd_name = cmd_dbg
         cmd_label = f"`/{cmd_name}`" if cmd_name else "this command"
 
-        server_reply = (
-            f"🚫 **KlaraAI only works in Direct Messages.**\n\n"
-            f"You tried {cmd_label} in this server.\n"
-            f"📨 Check your DMs — I just sent you the answer to {cmd_label}."
+        # Red embed so it reads as an error, not as a normal bot response.
+        server_embed = discord.Embed(
+            title="🚫 Command not allowed in this server",
+            description=(
+                f"KlaraAI works **only in Direct Messages** with the bot.\n\n"
+                f"You tried {cmd_label} here — that doesn't work in servers, "
+                f"not even in the support server.\n\n"
+                f"📨 **Check your DMs** — I just sent you the answer to "
+                f"{cmd_label} privately."
+            ),
+            color=0xef4444,
         )
+        server_embed.set_footer(text="KlaraAI · DM-only for privacy and 18+ content.")
         try:
             if not interaction.response.is_done():
-                await interaction.response.send_message(server_reply, ephemeral=True)
+                await interaction.response.send_message(embed=server_embed, ephemeral=True)
             else:
-                await interaction.followup.send(server_reply, ephemeral=True)
+                await interaction.followup.send(embed=server_embed, ephemeral=True)
         except Exception as e:
             print(f"[InteractionCheck] in-server reply failed: {e}")
 
@@ -452,6 +475,14 @@ class ERPBot(commands.Bot):
         await self.wait_until_ready()
 
     async def on_app_command_error(self, interaction: discord.Interaction, error):
+        try:
+            from discord.app_commands import errors as app_errors
+            if isinstance(error, app_errors.CheckFailure):
+                print(f"[App] swallowed CheckFailure (handled in interaction_check): {error}")
+                return
+        except Exception:
+            pass
+
         print(f"[ERROR] Slash command error: {error}")
         traceback.print_exc()
         try:
@@ -463,6 +494,18 @@ class ERPBot(commands.Bot):
             pass
 
     async def on_tree_error(self, interaction: discord.Interaction, error):
+        # interaction_check returning False raises CheckFailure under the
+        # hood — we ALREADY handled the user-facing response inside the
+        # check (red embed + DM dispatch), so don't send a second
+        # "An error occurred" message on top of it.
+        try:
+            from discord.app_commands import errors as app_errors
+            if isinstance(error, app_errors.CheckFailure):
+                print(f"[Tree] swallowed CheckFailure (handled in interaction_check): {error}")
+                return
+        except Exception:
+            pass
+
         print(f"[ERROR] Tree error: {error}")
         traceback.print_exc()
         try:
