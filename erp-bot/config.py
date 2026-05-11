@@ -13,7 +13,10 @@ LLM_PRIMARY = os.getenv("LLM_PRIMARY", "groq")  # "groq" or "openrouter"
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Comma-separated list of Discord user IDs that are bot admins.
-# Only these users can run /admin* commands (give credits, ban, unban, etc.).
+# Used by the web admin panel (/admin on the website) and by the bot to
+# decorate the /profile and /premium embeds with an ADMIN badge. The
+# in-bot /admincredits and /admininfo slash commands have been removed —
+# all credit management now happens via the web panel.
 # Set on Render as: ADMIN_USER_IDS=123456789012345678,234567890123456789
 def _parse_admin_ids() -> set[int]:
     raw = os.getenv("ADMIN_USER_IDS", "")

@@ -73,7 +73,6 @@ class ERPBot(commands.Bot):
         await self.add_cog(ERPCog(self))
         await self.add_cog(Characters(self))
         await self.add_cog(SocialCog(self))
-        await self.add_cog(AdminCog(self))
         await self.add_cog(VerificationCog(self))
         await self.add_cog(StatusCog(self))
         print("[OK] Cogs loaded")
@@ -549,7 +548,6 @@ from cogs.premium import PremiumCog
 from cogs.erp import ERPCog
 from cogs.characters import Characters
 from cogs.social import SocialCog
-from cogs.admin import AdminCog
 from cogs.verification import VerificationCog
 from cogs.status import StatusCog
 
