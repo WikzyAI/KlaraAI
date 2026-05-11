@@ -73,6 +73,7 @@ class ERPBot(commands.Bot):
         await self.add_cog(Characters(self))
         await self.add_cog(SocialCog(self))
         await self.add_cog(AdminCog(self))
+        await self.add_cog(VerificationCog(self))
         print("[OK] Cogs loaded")
 
         self.tree.interaction_check = self._global_interaction_check
@@ -100,6 +101,12 @@ class ERPBot(commands.Bot):
 
     async def _global_interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.guild is not None:
+            # Allow interactions inside the KlaraAI Support server so the
+            # persistent age-verify button + future support-server-only
+            # commands keep working. Every other guild is still refused —
+            # the bot is otherwise strictly DM-only for ERP usage.
+            if config.SUPPORT_GUILD_ID and interaction.guild.id == config.SUPPORT_GUILD_ID:
+                return True
             await interaction.response.send_message(
                 "This bot only works in DMs.",
                 ephemeral=True
@@ -187,6 +194,7 @@ from cogs.erp import ERPCog
 from cogs.characters import Characters
 from cogs.social import SocialCog
 from cogs.admin import AdminCog
+from cogs.verification import VerificationCog
 
 
 if __name__ == "__main__":

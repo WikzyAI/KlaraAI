@@ -26,6 +26,16 @@ def _parse_admin_ids() -> set[int]:
 
 ADMIN_USER_IDS = _parse_admin_ids()
 
+# Optional: the Discord Guild (server) ID of the KlaraAI Support server.
+# When set, the bot allows guild interactions in that one server (needed for
+# the persistent "I am 18+" verification button). All other guilds are still
+# refused — the bot remains DM-only for actual ERP usage.
+def _parse_support_guild_id() -> int:
+    raw = os.getenv("SUPPORT_GUILD_ID", "").strip()
+    return int(raw) if raw.isdigit() else 0
+
+SUPPORT_GUILD_ID = _parse_support_guild_id()
+
 CHARACTERS_FILE = "characters.json"
 PROFILES_FILE = "profiles.json"
 HISTORY_FILE = "history.json"
