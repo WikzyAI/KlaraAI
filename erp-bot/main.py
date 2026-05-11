@@ -10,6 +10,7 @@ import itertools
 import traceback
 import os
 from utils.db import PostgresDB
+from utils.api_client import get_credits
 
 
 # Rotating presence — cycles every PRESENCE_INTERVAL seconds.
@@ -111,60 +112,233 @@ class ERPBot(commands.Bot):
         print("[OK] Database pool closed")
 
     async def _global_interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.guild is not None:
-            # Allow interactions inside the KlaraAI Support server so the
-            # persistent age-verify button + future support-server-only
-            # commands keep working. Every other guild is still refused —
-            # the bot is otherwise strictly DM-only for ERP usage.
-            if config.SUPPORT_GUILD_ID and interaction.guild.id == config.SUPPORT_GUILD_ID:
-                return True
+        if interaction.guild is None:
+            return True  # DMs are always allowed
 
-            # Refuse the interaction in-server, then DM the user with a
-            # tailored explanation of the exact command they tried. The
-            # in-server response is ephemeral (only the caller sees it).
-            cmd_name = (
-                interaction.command.qualified_name
-                if interaction.command is not None
-                else None
+        # In the support guild we ONLY allow component interactions (the
+        # age-verify button, future button menus, etc.). Slash commands and
+        # modal submits are still refused even there — the bot is DM-only
+        # for any actual usage.
+        is_support_guild = (
+            config.SUPPORT_GUILD_ID
+            and interaction.guild.id == config.SUPPORT_GUILD_ID
+        )
+        if is_support_guild and interaction.type == discord.InteractionType.component:
+            return True
+
+        # From here on: slash command (or any other interaction) in a guild.
+        # Refuse + run the command's logic in DM context.
+        cmd_name = (
+            interaction.command.qualified_name
+            if interaction.command is not None
+            else None
+        )
+        cmd_label = f"`/{cmd_name}`" if cmd_name else "this command"
+
+        server_reply = (
+            f"🚫 **KlaraAI only works in Direct Messages.**\n\n"
+            f"You tried {cmd_label} in this server.\n"
+            f"📨 Check your DMs — I just sent you the answer to {cmd_label}."
+        )
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(server_reply, ephemeral=True)
+            else:
+                await interaction.followup.send(server_reply, ephemeral=True)
+        except Exception as e:
+            print(f"[InteractionCheck] in-server reply failed: {e}")
+
+        # Forward the command to the user's DM. We try to actually run the
+        # command's logic (so they get the real /profile, /premium, /help...
+        # output) and fall back to a hint embed for commands that need
+        # interactive DM context (/erp, /settings, /memories) or that we
+        # don't know how to forward.
+        try:
+            sent_real_result = await self._dispatch_command_to_dm(
+                cmd_name, interaction
             )
-            cmd_label = f"`/{cmd_name}`" if cmd_name else "this command"
-
-            server_reply = (
-                f"🚫 **KlaraAI only works in Direct Messages.**\n\n"
-                f"You tried {cmd_label} in this server.\n"
-                f"📨 I'm sending you a DM right now with how to use {cmd_label} properly."
-            )
+        except discord.Forbidden:
             try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message(server_reply, ephemeral=True)
-                else:
-                    await interaction.followup.send(server_reply, ephemeral=True)
-            except Exception as e:
-                print(f"[InteractionCheck] in-server reply failed: {e}")
+                await interaction.followup.send(
+                    "⚠️ I couldn't DM you — your DMs from server members "
+                    "are closed.\n"
+                    "Open **User Settings → Privacy & Safety → Server "
+                    "Privacy Defaults** and enable *Allow direct messages "
+                    "from server members*, then try the command again.",
+                    ephemeral=True,
+                )
+            except Exception:
+                pass
+            return False
+        except Exception as e:
+            print(f"[InteractionCheck] dispatch_to_dm failed: {type(e).__name__}: {e}")
+            sent_real_result = False
 
-            # Try to DM the user with a command-specific hint.
-            dm_embed = self._build_dm_redirect_embed(cmd_name, interaction.guild.name)
+        # If we couldn't run the actual command, at least send the
+        # tailored hint embed so the user knows what to do next.
+        if not sent_real_result:
             try:
-                await interaction.user.send(embed=dm_embed)
+                hint_embed = self._build_dm_redirect_embed(
+                    cmd_name, interaction.guild.name
+                )
+                await interaction.user.send(embed=hint_embed)
             except discord.Forbidden:
-                # User has DMs from server members disabled — tell them how
-                # to fix it via the same ephemeral reply we already used.
                 try:
                     await interaction.followup.send(
                         "⚠️ I couldn't DM you — your DMs from server members "
-                        "are closed.\n"
-                        "Open **User Settings → Privacy & Safety → Server "
-                        "Privacy Defaults** and enable *Allow direct messages "
-                        "from server members*, then try the command again.",
+                        "are closed. Enable *Allow direct messages from server "
+                        "members* in your Discord settings.",
                         ephemeral=True,
                     )
                 except Exception:
                     pass
             except Exception as e:
-                print(f"[InteractionCheck] DM redirect failed: {e}")
+                print(f"[InteractionCheck] hint DM failed: {e}")
 
+        return False
+
+    async def _dispatch_command_to_dm(
+        self, cmd_name: str | None, interaction: discord.Interaction
+    ) -> bool:
+        """Run the equivalent of the user's slash command and DM them the result.
+
+        Returns True if the actual command result was sent, False if we
+        only know how to send a generic hint for this command.
+        """
+        if cmd_name is None:
             return False
-        return True
+
+        user = interaction.user
+
+        # /profile — full profile embed (plan, credits, streak, quota).
+        if cmd_name == "profile":
+            profile_cog = self.get_cog("ProfileCog")
+            if profile_cog is None:
+                return False
+            try:
+                profile = await asyncio.wait_for(
+                    PostgresDB.get_profile(user.id), timeout=10.0
+                )
+            except Exception as e:
+                print(f"[DM-dispatch /profile] get_profile failed: {e}")
+                return False
+            credits = None
+            try:
+                credits_data = await asyncio.wait_for(
+                    asyncio.to_thread(get_credits, str(user.id)),
+                    timeout=10.0,
+                )
+                credits = credits_data.get("credits", 0)
+            except Exception as e:
+                print(f"[DM-dispatch /profile] get_credits failed: {e}")
+            embed = await profile_cog._build_profile_embed_async(
+                user, profile, credits=credits
+            )
+            await user.send(embed=embed)
+            return True
+
+        # /premium — subscription & credits summary.
+        if cmd_name == "premium":
+            try:
+                profile = await asyncio.wait_for(
+                    PostgresDB.get_profile(user.id), timeout=10.0
+                )
+                sub_type = await asyncio.wait_for(
+                    PostgresDB.get_sub_type(user.id), timeout=10.0
+                )
+                limits = await asyncio.wait_for(
+                    PostgresDB.get_limits(user.id), timeout=10.0
+                )
+            except Exception as e:
+                print(f"[DM-dispatch /premium] DB error: {e}")
+                return False
+            credits = 0
+            try:
+                credits_data = await asyncio.wait_for(
+                    asyncio.to_thread(get_credits, str(user.id)),
+                    timeout=10.0,
+                )
+                credits = credits_data.get("credits", 0)
+            except Exception as e:
+                print(f"[DM-dispatch /premium] credits fetch failed: {e}")
+
+            sub_emoji = {"free": "🌿", "standard": "💎", "premium": "👑"}.get(sub_type, "✨")
+            is_admin = user.id in config.ADMIN_USER_IDS
+            plan_label = f"{sub_emoji} **{limits['name']}**"
+            if is_admin:
+                plan_label += "  ·  🛡️ **ADMIN**"
+
+            embed = discord.Embed(
+                title="👑 Subscription & Credits",
+                description=f"Current plan: {plan_label}",
+                color=discord.Color.from_rgb(239, 68, 68) if is_admin else discord.Color.from_rgb(241, 196, 15),
+            )
+            msgs_used = profile.get("daily_msgs_used", 0)
+            sess_used = profile.get("daily_sessions_used", 0)
+            msgs_limit = "∞" if limits["daily_msgs"] == -1 else limits["daily_msgs"]
+            sess_limit = "∞" if limits["daily_sessions"] == -1 else limits["daily_sessions"]
+            embed.add_field(
+                name="💰 Wallet",
+                value=f"**{credits}** credits  *(${credits/100:.2f})*",
+                inline=True,
+            )
+            embed.add_field(name="💬 Messages today", value=f"{msgs_used} / {msgs_limit}", inline=True)
+            embed.add_field(name="🎬 Sessions today", value=f"{sess_used} / {sess_limit}", inline=True)
+            embed.add_field(
+                name="🔁 Manage your plan",
+                value="Type `/premium` here in DM to see the upgrade options and click the buttons.",
+                inline=False,
+            )
+            embed.set_footer(text="KlaraAI · Sent from the server because the bot is DM-only.")
+            await user.send(embed=embed)
+            return True
+
+        # /help — full command list (static, safe everywhere).
+        if cmd_name == "help":
+            embed = discord.Embed(
+                title="📖 KlaraAI — Commands",
+                description=(
+                    "All commands work **only in this DM**. Here's what each one does:\n\n"
+                    "**Core**\n"
+                    "• `/erp` — Pick a character and start a private 18+ scene\n"
+                    "• `/profile` — Profile, credits, plan, daily quota, streak\n"
+                    "• `/settings` — Response length, language, custom characters\n"
+                    "• `/premium` — Subscription overview, upgrade or cancel\n\n"
+                    "**Social**\n"
+                    "• `/referral` — Your invite code + bonus credit stats\n\n"
+                    "**Memory**\n"
+                    "• `/memories` — Browse, edit or wipe what I remember\n\n"
+                    "**Help**\n"
+                    "• `/help` — This list."
+                ),
+                color=0x9b59b6,
+            )
+            embed.set_footer(text="KlaraAI · DM-only for privacy and 18+ content.")
+            await user.send(embed=embed)
+            return True
+
+        # /referral — invite stats.
+        if cmd_name == "referral":
+            social_cog = self.get_cog("SocialCog")
+            if social_cog is None:
+                return False
+            # SocialCog may expose a helper; if not, hint instead so we
+            # don't crash on missing internals.
+            builder = getattr(social_cog, "_build_referral_embed", None)
+            if not builder:
+                return False
+            try:
+                embed = await builder(user)
+                await user.send(embed=embed)
+                return True
+            except Exception as e:
+                print(f"[DM-dispatch /referral] failed: {e}")
+                return False
+
+        # Commands that need interactive DM context (sessions, modals,
+        # multi-step views) — we point the user back to the DM instead of
+        # trying to half-run them.
+        return False
 
     def _build_dm_redirect_embed(self, cmd_name: str | None, guild_name: str) -> discord.Embed:
         """Build the DM the bot sends after refusing an in-server command.
