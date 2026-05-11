@@ -74,6 +74,7 @@ class ERPBot(commands.Bot):
         await self.add_cog(SocialCog(self))
         await self.add_cog(AdminCog(self))
         await self.add_cog(VerificationCog(self))
+        await self.add_cog(StatusCog(self))
         print("[OK] Cogs loaded")
 
         self.tree.interaction_check = self._global_interaction_check
@@ -88,6 +89,16 @@ class ERPBot(commands.Bot):
 
     async def cleanup(self):
         """Clean up resources on shutdown."""
+        # Best-effort: flip the support-server status message to "Offline"
+        # before we lose the network. Must happen BEFORE we tear down the
+        # discord client, otherwise the edit just fails silently.
+        status_cog = self.get_cog("StatusCog")
+        if status_cog is not None:
+            try:
+                await status_cog.mark_offline()
+            except Exception as e:
+                print(f"[Cleanup] StatusCog.mark_offline failed: {e}")
+
         if self.rotate_presence.is_running():
             self.rotate_presence.cancel()
         if self._keep_alive_runner is not None:
@@ -195,6 +206,7 @@ from cogs.characters import Characters
 from cogs.social import SocialCog
 from cogs.admin import AdminCog
 from cogs.verification import VerificationCog
+from cogs.status import StatusCog
 
 
 if __name__ == "__main__":
