@@ -18,7 +18,8 @@ from utils.api_client import get_credits
 # streaming because Discord forces streaming activities to show a "Watch"
 # button that always opens a twitch.tv/youtube.com URL (it cannot point to
 # arbitrary sites). Playing keeps the rotating text without a stray link.
-PRESENCE_INTERVAL = 45  # seconds — Discord rate-limits presence updates
+PRESENCE_INTERVAL = 180  # seconds — keep this generous, Cloudflare 1015s
+                          # the bot's whole IP when we ping Discord too often.
 
 PRESENCE_ROTATION = [
     "💋 ERP with Lilith",
@@ -461,6 +462,12 @@ class ERPBot(commands.Bot):
                 status=discord.Status.online,
                 activity=discord.Game(name=name),
             )
+        except discord.HTTPException as e:
+            # Cloudflare 1015 / Discord 429 — back off, don't crash the loop.
+            if e.status == 429:
+                print(f"[Presence] rate limited (429), skipping this tick.")
+            else:
+                print(f"[Presence] HTTP {e.status}: {e}")
         except Exception as e:
             print(f"[Presence] change_presence failed: {e}")
 

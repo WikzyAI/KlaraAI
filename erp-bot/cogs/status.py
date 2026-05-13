@@ -30,9 +30,15 @@ from discord.ext import commands, tasks
 import config
 
 
-HEARTBEAT_INTERVAL = 60  # seconds between message edits
+HEARTBEAT_INTERVAL = 300  # seconds between message edits (5 min). Used to be
+                          # 60s, but combined with the presence rotation that
+                          # hammered Discord's API enough to trigger a
+                          # Cloudflare 1015 IP-level rate limit on Render's
+                          # shared IP. 5 min is plenty — Discord renders
+                          # <t:NOW:R> client-side so the relative time on the
+                          # message keeps looking fresh between edits.
 STATUS_CHANNEL_NAME = "status"
-STALE_THRESHOLD_SECONDS = 120  # how long we tell users to wait before assuming offline
+STALE_THRESHOLD_SECONDS = 600  # users should wait ~10 min before assuming offline
 
 
 def _format_uptime(seconds: int) -> str:
@@ -69,10 +75,10 @@ class StatusCog(commands.Cog):
                 "The bot is **up and responding normally.**\n\n"
                 f"⏱️  Last heartbeat: <t:{ts}:R>  ·  *<t:{ts}:T>*\n"
                 f"📈  Uptime: **{uptime}**\n"
-                f"🔄  Auto-refresh: every **{HEARTBEAT_INTERVAL}s**\n\n"
+                f"🔄  Auto-refresh: every **{HEARTBEAT_INTERVAL // 60} min**\n\n"
                 f"_If the 'Last heartbeat' shown above is more than "
                 f"~{STALE_THRESHOLD_SECONDS // 60} minutes old, the bot is "
-                f"probably offline — wait a few minutes or ping an admin._"
+                f"probably offline — wait a bit longer or ping an admin._"
             ),
             color=0x10b981,
         )
