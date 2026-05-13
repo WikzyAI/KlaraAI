@@ -17,8 +17,10 @@ Order of operation per generate() call:
 
 The class is still named GroqClient for backwards-compat with imports.
 """
+import asyncio
 import os
 import re
+import time
 import httpx
 from httpx import HTTPStatusError, RequestError
 
@@ -127,31 +129,17 @@ class GroqClient:
                 name="groq",
                 base_url="https://api.groq.com/openai/v1/chat/completions",
                 api_key=groq_key,
+                # Keep the Groq roster tight: every model below is verified to
+                # exist on Groq's free tier and to play nicely with the
+                # jailbreak prompt. Adding unverified IDs caused the bot to
+                # hang on "thinking..." because each failing model burned a
+                # full HTTP timeout before we moved on.
                 models=[
-                    # ─── TIER 1 — least aligned, jailbreak-friendly ────────
-                    # These accept the system-prompt jailbreak the cleanest
-                    # and produce the best creative ERP output on Groq.
-                    "qwen/qwen3-32b",                # excellent creative + low alignment
-                    "deepseek-r1-distill-llama-70b", # reasoning model, our <think> stripper handles CoT
-                    "qwen-qwq-32b",                  # second Qwen reasoning variant
-
-                    # ─── TIER 2 — large general models, decent with jailbreak ──
-                    "meta-llama/llama-4-maverick-17b-128e-instruct",
-                    "meta-llama/llama-4-scout-17b-16e-instruct",
-                    "llama-3.3-70b-versatile",       # classic 70B, sometimes refuses but jailbreak rescues
-                    "llama-3.1-70b-versatile",       # older 70B, kept as backup
-
-                    # ─── TIER 3 — OpenAI open models, larger but more aligned ──
-                    "openai/gpt-oss-120b",
-                    "openai/gpt-oss-20b",
-
-                    # ─── TIER 4 — emergency fast/cheap fallbacks ───────────
-                    "mistral-saba-24b",              # multi-lingual, decent French
-                    "llama-3.1-8b-instant",          # fastest, last resort
-
-                    # DISABLED — known issues:
-                    # "allam-2-7b": Arabic-focused, mangled French output
-                    # "gemma2-9b-it": refuses everything explicit even with jailbreak
+                    "qwen/qwen3-32b",         # primary — best creative on Groq
+                    "openai/gpt-oss-120b",    # big OpenAI open model
+                    "openai/gpt-oss-20b",     # smaller fallback
+                    "llama-3.3-70b-versatile",  # decent 70B, jailbreak rescues most refusals
+                    "llama-3.1-8b-instant",   # last-resort fast model
                 ],
             ))
 
@@ -161,24 +149,17 @@ class GroqClient:
                 name="openrouter",
                 base_url="https://openrouter.ai/api/v1/chat/completions",
                 api_key=openrouter_key,
+                # Keep this list short and verified too — too many fallbacks
+                # turn every degraded request into a 5-minute "thinking..."
+                # spinner. Order: free first (zero-budget safe), then cheap
+                # paid only if free is exhausted.
                 models=[
-                    # ─── FREE MODELS FIRST ────────────────────────────────
-                    # Free tier on OpenRouter — strict rate limits (~20 req/min,
-                    # 200 req/day per account) but $0 cost, ideal while we
-                    # bootstrap from a zero budget.
-                    "gryphe/mythomax-l2-13b:free",            # legendary NSFW finetune, free when up
-                    "nousresearch/hermes-3-llama-3.1-405b:free",  # huge less-aligned model, sometimes free
-                    "liquid/lfm-40b:free",                     # decent quality free fallback
-                    "mistralai/mistral-7b-instruct:free",     # basic but works
-                    "meta-llama/llama-3.2-3b-instruct:free",  # tiny emergency
-
-                    # ─── PAID FALLBACK (only fires when free tier is exhausted) ──
-                    # These cost cents on the dollar; reinvest your first Stripe
-                    # sale here. MythoMax paid is the best price/quality NSFW.
-                    "gryphe/mythomax-l2-13b",                  # ~$0.27/M tokens, NSFW-native
-                    "nothingiisreal/mn-celeste-12b",           # NSFW finetune, ~$0.50/M
-                    "neversleep/llama-3.1-lumimaid-70b",       # premium NSFW, ~$1.50/M tokens
-                    "nousresearch/hermes-3-llama-3.1-405b",   # huge model, paid version
+                    # FREE — when up they save the day at $0 cost.
+                    "gryphe/mythomax-l2-13b:free",
+                    "meta-llama/llama-3.2-3b-instruct:free",
+                    # PAID — cheap NSFW-friendly fallbacks.
+                    "gryphe/mythomax-l2-13b",
+                    "neversleep/llama-3.1-lumimaid-70b",
                 ],
                 extra_headers={
                     "HTTP-Referer": "https://www.klaraai.me",
@@ -204,7 +185,11 @@ class GroqClient:
 
     async def _call(self, provider: _Provider, model: str, messages: list,
                     temperature: float, max_tokens: int) -> str:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # Tight per-call timeout (25s). The previous 60s × many fallback
+        # models meant a single user could wait several minutes on
+        # "thinking..." if upstream APIs were degraded. 25s is more than
+        # enough for any healthy chat completion.
+        async with httpx.AsyncClient(timeout=25.0) as client:
             headers = {
                 "Authorization": f"Bearer {provider.api_key}",
                 "Content-Type": "application/json",
@@ -252,13 +237,24 @@ class GroqClient:
 
         last_error = None
 
+        # Global deadline (75 s): if the whole cascade hasn't produced a
+        # response by then, we bail out and return the graceful fallback
+        # rather than letting Discord show "thinking..." for minutes.
+        deadline = time.monotonic() + 75.0
+
         for provider in self.providers:
             if provider.disabled:
                 continue
+            if time.monotonic() > deadline:
+                print("[LLM] Global deadline reached — bailing out of provider loop.")
+                break
 
             tried = 0
             n = len(provider.models)
             while tried < n:
+                if time.monotonic() > deadline:
+                    print("[LLM] Global deadline reached — bailing out of model loop.")
+                    break
                 model = provider.models[provider.current_index]
                 full_id = f"{provider.name}/{model}"
                 print(f"[LLM] Trying {full_id} (max_tokens={max_tokens}, retry_disabled={disable_refusal_retry})")
