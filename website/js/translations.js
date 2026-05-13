@@ -10,6 +10,12 @@ const translations = {
         nav_buy: "Acheter",
         nav_buy_credits: "Acheter des crédits",
         nav_login: "Se connecter",
+        nav_support: "💬 Support",
+        fab_support: "Support Discord",
+        footer_community: "Communauté",
+        footer_support: "💬 Serveur Discord (support)",
+        footer_bugs: "🐛 Signaler un bug",
+        footer_feedback: "💡 Suggestions",
 
         // Age Verify
         age_title: "⚠️ Accès Réservé",
@@ -255,6 +261,12 @@ const translations = {
         nav_buy: "Shop",
         nav_buy_credits: "Buy Credits",
         nav_login: "Login",
+        nav_support: "💬 Support",
+        fab_support: "Discord Support",
+        footer_community: "Community",
+        footer_support: "💬 Discord support server",
+        footer_bugs: "🐛 Report a bug",
+        footer_feedback: "💡 Suggestions",
 
         // Age Verify
         age_title: "⚠️ Restricted Access",
@@ -495,6 +507,12 @@ const translations = {
         nav_home: "Inicio",
         nav_pricing: "Precios",
         nav_buy: "Tienda",
+        nav_support: "💬 Soporte",
+        fab_support: "Soporte Discord",
+        footer_community: "Comunidad",
+        footer_support: "💬 Servidor Discord (soporte)",
+        footer_bugs: "🐛 Reportar un error",
+        footer_feedback: "💡 Sugerencias",
         nav_buy_credits: "Comprar Créditos",
         nav_login: "Iniciar sesión",
 
@@ -667,6 +685,12 @@ const translations = {
         nav_buy: "Negozio",
         nav_buy_credits: "Compra Crediti",
         nav_login: "Accedi",
+        nav_support: "💬 Supporto",
+        fab_support: "Supporto Discord",
+        footer_community: "Comunità",
+        footer_support: "💬 Server Discord (supporto)",
+        footer_bugs: "🐛 Segnala un bug",
+        footer_feedback: "💡 Suggerimenti",
 
         // Age Verify
         age_title: "⚠️ Accesso Riservato",
