@@ -128,21 +128,30 @@ class GroqClient:
                 base_url="https://api.groq.com/openai/v1/chat/completions",
                 api_key=groq_key,
                 models=[
-                    # Preferred — better creative / less aligned, tried first.
-                    "qwen/qwen3-32b",
+                    # ─── TIER 1 — least aligned, jailbreak-friendly ────────
+                    # These accept the system-prompt jailbreak the cleanest
+                    # and produce the best creative ERP output on Groq.
+                    "qwen/qwen3-32b",                # excellent creative + low alignment
+                    "deepseek-r1-distill-llama-70b", # reasoning model, our <think> stripper handles CoT
+                    "qwen-qwq-32b",                  # second Qwen reasoning variant
+
+                    # ─── TIER 2 — large general models, decent with jailbreak ──
+                    "meta-llama/llama-4-maverick-17b-128e-instruct",
+                    "meta-llama/llama-4-scout-17b-16e-instruct",
+                    "llama-3.3-70b-versatile",       # classic 70B, sometimes refuses but jailbreak rescues
+                    "llama-3.1-70b-versatile",       # older 70B, kept as backup
+
+                    # ─── TIER 3 — OpenAI open models, larger but more aligned ──
                     "openai/gpt-oss-120b",
                     "openai/gpt-oss-20b",
-                    # allam-2-7b — DISABLED. It's an Arabic-focused model
-                    # and produced garbled French ("If tu veux", "ami(e)",
-                    # "que tu font") for users picking the FR / Auto
-                    # language directive.
-                    # "allam-2-7b",
-                    # Meta / Llama family — TEMPORARILY DISABLED.
-                    # They ignored the language directive (replied in EN even
-                    # when user picked FR) and gave mediocre ERP output.
-                    # "meta-llama/llama-4-scout-17b-16e-instruct",
-                    # "llama-3.3-70b-versatile",
-                    # "llama-3.1-8b-instant",
+
+                    # ─── TIER 4 — emergency fast/cheap fallbacks ───────────
+                    "mistral-saba-24b",              # multi-lingual, decent French
+                    "llama-3.1-8b-instant",          # fastest, last resort
+
+                    # DISABLED — known issues:
+                    # "allam-2-7b": Arabic-focused, mangled French output
+                    # "gemma2-9b-it": refuses everything explicit even with jailbreak
                 ],
             ))
 
@@ -153,15 +162,23 @@ class GroqClient:
                 base_url="https://openrouter.ai/api/v1/chat/completions",
                 api_key=openrouter_key,
                 models=[
-                    # Quality NSFW finetunes first (paid but cheap).
-                    "neversleep/llama-3.1-lumimaid-70b",
-                    "gryphe/mythomax-l2-13b",
-                    "nothingiisreal/mn-celeste-12b",
-                    # Larger general models, less aligned than commercial flagships.
-                    "nousresearch/hermes-3-llama-3.1-405b",
-                    # Free fallbacks (rate-limited but usable as last resort).
-                    "gryphe/mythomax-l2-13b:free",
-                    "meta-llama/llama-3.2-3b-instruct:free",
+                    # ─── FREE MODELS FIRST ────────────────────────────────
+                    # Free tier on OpenRouter — strict rate limits (~20 req/min,
+                    # 200 req/day per account) but $0 cost, ideal while we
+                    # bootstrap from a zero budget.
+                    "gryphe/mythomax-l2-13b:free",            # legendary NSFW finetune, free when up
+                    "nousresearch/hermes-3-llama-3.1-405b:free",  # huge less-aligned model, sometimes free
+                    "liquid/lfm-40b:free",                     # decent quality free fallback
+                    "mistralai/mistral-7b-instruct:free",     # basic but works
+                    "meta-llama/llama-3.2-3b-instruct:free",  # tiny emergency
+
+                    # ─── PAID FALLBACK (only fires when free tier is exhausted) ──
+                    # These cost cents on the dollar; reinvest your first Stripe
+                    # sale here. MythoMax paid is the best price/quality NSFW.
+                    "gryphe/mythomax-l2-13b",                  # ~$0.27/M tokens, NSFW-native
+                    "nothingiisreal/mn-celeste-12b",           # NSFW finetune, ~$0.50/M
+                    "neversleep/llama-3.1-lumimaid-70b",       # premium NSFW, ~$1.50/M tokens
+                    "nousresearch/hermes-3-llama-3.1-405b",   # huge model, paid version
                 ],
                 extra_headers={
                     "HTTP-Referer": "https://www.klaraai.me",
