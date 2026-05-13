@@ -71,7 +71,6 @@ class ERPBot(commands.Bot):
         await self.add_cog(ProfileCog(self))
         await self.add_cog(PremiumCog(self))
         await self.add_cog(ERPCog(self))
-        await self.add_cog(Characters(self))
         await self.add_cog(SocialCog(self))
         await self.add_cog(VerificationCog(self))
         await self.add_cog(StatusCog(self))
@@ -546,7 +545,6 @@ from cogs.general import GeneralCog
 from cogs.profile import ProfileCog
 from cogs.premium import PremiumCog
 from cogs.erp import ERPCog
-from cogs.characters import Characters
 from cogs.social import SocialCog
 from cogs.verification import VerificationCog
 from cogs.status import StatusCog
